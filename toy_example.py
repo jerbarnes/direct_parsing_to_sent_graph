@@ -1,6 +1,6 @@
 from transformers import AutoModel, AutoTokenizer
 #from model.transformers.modeling_bert import BertModel
-from utility.bert_tokenizer import bert_tokenizer
+from utils.bert_tokenizer import bert_tokenizer
 import torch
 from torch import nn
 import torch.nn.functional as F
