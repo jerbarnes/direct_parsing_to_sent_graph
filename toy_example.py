@@ -151,8 +151,6 @@ def predict_relations(sent, encoder, decoder, return_both=True):
     target_idxs = sent["targets"]
     exp_idxs = sent["exps"]
 
-    gold_tensor = torch.LongTensor(sent["relations"])
-
     num_holder = len(holder_idxs)
     num_target = len(target_idxs)
     num_exp = len(exp_idxs)
@@ -165,6 +163,7 @@ def predict_relations(sent, encoder, decoder, return_both=True):
                                         exp_idxs)
 
     if return_both:
+        gold_tensor = torch.LongTensor(sent["relations"])
         pred_tensor = pred_tensor.reshape((num_holder * num_target * num_exp, num_classes))
         gold_tensor = gold_tensor.reshape(num_holder * num_target * num_exp)
         return pred_tensor, gold_tensor
@@ -193,31 +192,42 @@ if __name__ == "__main__":
 
     tokenizer = AutoTokenizer.from_pretrained(args.encoder)
 
-    example1 = {"input": "I really loved the great views !".split(),
+    example1 = {"input": "<null> I really loved the great views !".split(),
                 "output": [(["I"], ["the great views"],["really loved"],"POS"),
                            (["I"], ["views"], ["great"], "POS")
                            ],
-                "holders": [[0]],
-                "targets": [[3, 4, 5], [5]],
+                "holders": [[0], [1]],
+                "targets": [[0], [4, 5, 6], [6]],
                 "exps": [[1, 2], [4]],
-                "relations": [[[2, 0], [2, 0]]]
+                "relations":  [[[0, 0],
+                                [0, 0],
+                                [0, 0]],
+                               [[0, 0],
+                                [2, 0],
+                                [2, 0]]]
                 }
-    example2 = {"input": "I like Peppes more than Dominos !".split(),
+    example2 = {"input": "<null> I like Peppes more than Dominos !".split(),
                 "output": [(["I"], ["Peppes"], ["like", "more than"], "POS"),
                            (["I"], ["Dominos"], ["like", "more than"], "NEG")
                            ],
-                "holders": [[0]],
-                "targets": [[2], [5]],
-                "exps": [[1, 3, 4]],
-                "relations": [[[2], [1]]]
+                "holders": [[0], [1]],
+                "targets": [[0], [3], [6]],
+                "exps": [[2, 4, 5]],
+                "relations": [[[0],
+                               [0],
+                               [0]],
+                              [[0],
+                               [2],
+                               [1]]]
                 }
 
     example3 = {"input": "<null> The TV was pretty cool".split(),
                 "output": [(["<null>"], ["The TV"], ["pretty cool"], "POS")],
                 "holders": [[0]],
-                "targets": [[1, 2]],
+                "targets": [[0], [1, 2]],
                 "exps": [[4, 5]],
-                "relations": [[[2]]]
+                "relations": [[[0],
+                               [2]]]
                 }
 
     example4 = {"input": "<null> Definitely pretty cool , but could be bigger".split(),
@@ -226,6 +236,22 @@ if __name__ == "__main__":
                 "targets": [[0]],
                 "exps": [[1, 2, 3], [6, 7, 8]],
                 "relations": [[[2], [1]]]
+                }
+
+    example5 = {"input": "<null> I like the views".split(),
+                "output": [(["I"], ["the views"], ["like"], "POS")],
+                "holders": [[0], [1]],
+                "targets": [[0], [3, 4]],
+                "exps": [[2]],
+                "relations": None
+                }
+
+    example6 = {"input": "<null> great TV".split(),
+                "output": [(["null"], ["TV"], ["great"], "POS")],
+                "holders": [[0]],
+                "targets": [[0], [2]],
+                "exps": [[1]],
+                "relations": None
                 }
 
 
@@ -240,13 +266,17 @@ if __name__ == "__main__":
 
     for i in range(15):
 
+        full_loss = 0.0
+
         for sent in [example1, example2, example3, example4]:
             optimizer.zero_grad()
 
             pred_tensor, gold_tensor = predict_relations(sent, encoder, decoder)
 
             loss = F.cross_entropy(pred_tensor, gold_tensor)
-            print("Loss: {0:.3f}".format(loss.data))
-            loss.backward()
-            optimizer.step()
+            full_loss += loss
+
+        print("Loss: {0:.3f}".format(full_loss.data))
+        full_loss.backward()
+        optimizer.step()
 
