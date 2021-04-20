@@ -1,6 +1,6 @@
 # sent_graph_followup
 
-# current directions and problems
+## current directions and problems
 
 1. Convert sentiment jsons to MRP json files
     - made changes to mtool to parse 'norec'
