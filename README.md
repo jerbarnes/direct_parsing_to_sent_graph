@@ -16,3 +16,35 @@
     - Does it work?
     - How does it compare to the ACL results?
 
+## PERIN Notes
+
+- relevant files to create
+    - perin/model/head/norec_head.py
+    - perin/data/parser/from_mrp/norec_parser.py
+    - perin/data/parser/to_mrp/norec_parser.py
+- eds and ptg as base
+    - eds is pretty _vanilla_, but has continuous nodes
+    - ptg has some more wild extras that can be ignored
+    - ptg has special top nodes making prediction redundant -> should be the
+        same for norec
+- differences to mrp
+    - no properties in norec-graphs
+    - labels are only absolute
+
+### Code Questions
+
+- how are properties treated in PERIN? 
+    - `node["properties"] = {"transformed": int("property" in node)}`
+    - `utils.normalize_properties(data)`
+- what about top nodes? There seems to always be only one in PERIN 
+    - `sentence["top"] = sentence["tops"][0]`
+- ...
+
+## Extras
+
+With the script `write_graphs.sh` one can create images of the sentiment graphs.
+To do so first run the python script `get_ids.py`, and then `write_graphs.sh`.
+This takes however a very long time, and might be less than optimal.
+The `--strings` option in the script can be deleted to give spans instead of
+tokens.
+
