@@ -19,6 +19,7 @@ def is_nested(offsets1, offsets2):
     # NOTE!! It does not check the other way around
     # Currently only works with continuous spans
     # TODO: extend to discontinous spans
+    # small change
     if len(offsets1) > 0 and len(offsets2) > 0:
         if len(offsets1) == 1 and len(offsets2) == 1:
             bidx1, eidx1 = np.array(offsets1[0].split(":"), dtype=int)
