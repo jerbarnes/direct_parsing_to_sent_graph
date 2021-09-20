@@ -36,9 +36,13 @@
 - how are properties treated in PERIN? 
     - `node["properties"] = {"transformed": int("property" in node)}`
     - `utils.normalize_properties(data)`
+    - *David: There are two ways:*
+        - *1) Properties are transformed into regular nodes so that they can use the relative encoding (useful e.g. for quantities). Then we also need to predict the flag "transformed" to convert the properties back.*
+        - *2) In PTG, the properties are predicted as part of each node -- there is too much of them and all of them (if I remember correctly) use a limited vocabulary.*
+        - *I'm not sure which one is more suitable for the extra properties in some datasets but it should be fairly easy to use either of them.*
 - what about top nodes? There seems to always be only one in PERIN 
     - `sentence["top"] = sentence["tops"][0]`
-- ...
+    - *David: Yeah, the code assumes there is only a single top node but it's possible to extend it to multiple tops. Is there a dataset where this explicit "top" prediction is needed?*
 
 ## Extras
 
