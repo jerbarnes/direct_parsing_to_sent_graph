@@ -40,7 +40,7 @@ def read(fp, text=None, reify=False, strict=False, node_centric=False):
                         properties = ["polarity"]
                         values = [opinion["Polarity"]]
                     expression = graph.add_node(
-                        label="expression",
+                        label="Expression",
                         top=not reify,
                         properties=properties,
                         values=values,
@@ -57,12 +57,12 @@ def read(fp, text=None, reify=False, strict=False, node_centric=False):
                         source = map[key]
                     else:
                         source = graph.add_node(
-                            label="source" if (not strict) or node_centric else None,
+                            label="Source" if (not strict) or node_centric else None,
                             anchors=anchor(source),
                         )
                         map[key] = source
                     graph.add_edge(
-                        expression.id, source.id, "source" if strict and (not node_centric) else None
+                        expression.id, source.id, "Source" if strict and (not node_centric) else None
                     )
 
                 target = opinion["Target"]
@@ -72,12 +72,12 @@ def read(fp, text=None, reify=False, strict=False, node_centric=False):
                         target = map[key]
                     else:
                         target = graph.add_node(
-                            label="target" if (not strict) or node_centric else None,
+                            label="Target" if (not strict) or node_centric else None,
                             anchors=anchor(target),
                         )
                         map[key] = target
                     graph.add_edge(
-                        expression.id, target.id, "target" if strict and (not node_centric) else None
+                        expression.id, target.id, "Target" if strict and (not node_centric) else None
                     )
             yield graph, None
 
