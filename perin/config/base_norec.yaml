@@ -1,0 +1,4 @@
+frameworks:
+- ["norec", "nor"]
+
+encoder: xlm-roberta-base
