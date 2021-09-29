@@ -63,7 +63,7 @@ class Params:
             ("ucca", "eng"): f"{base_dir}/2020/cf/training/ucca.mrp",
             ("ucca", "deu"): f"{base_dir}/2020/cl/training/ucca.deu_train.mrp",
 
-            ("norec", "no"): f"{base_dir}/node_centric_mrp/norec/train.mrp"
+            ("norec", "nor"): f"{base_dir}/node_centric_mrp/norec/train.mrp"
         }
 
         # path to the validation dataset

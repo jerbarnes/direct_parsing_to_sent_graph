@@ -27,17 +27,15 @@ class NorecParser(AbstractParser):
         self.framework = framework
         self.language = language
 
-        cache_path = f"{path}_cache"
-        if not os.path.exists(cache_path):
-            self.initialize(args, path, cache_path, args.companion_data[(framework, language)], precomputed_dataset=precomputed_dataset)
+        self.data = utils.load_dataset(path, framework=self.framework)
 
-        print("Loading the cached dataset")
+        utils.add_companion(self.data, None, self.language, tokenization_mode="space")  # add empty companion
+        utils.tokenize(self.data, mode="space")
 
-        self.data = {}
-        with io.open(cache_path, encoding="utf8") as reader:
-            for line in reader:
-                sentence = json.loads(line)
-                self.data[sentence["id"]] = sentence
+        # for d in self.data.values():
+        #     print(d)
+        #     exit()
+        utils.anchor_ids_from_intervals(self.data)
 
         self.node_counter, self.edge_counter, self.no_edge_counter = 0, 0, 0
         anchor_count, n_node_token_pairs = 0, 0
@@ -70,42 +68,6 @@ class NorecParser(AbstractParser):
         self.input_count = sum(len(sentence["input"]) for sentence in self.data.values())
 
         super(NorecParser, self).__init__(fields, self.data, filter_pred)
-
-    def initialize(self, args, raw_path, cache_path, companion_path, precomputed_dataset=None):
-        print("Caching the dataset...\n", flush=True)
-
-        data = utils.load_dataset(raw_path, framework=self.framework)
-
-        utils.tokenize(data, mode="space")
-        utils.add_companion(data, None, self.language)  # add empty companion
-        utils.anchor_ids_from_intervals(data)
-
-        with open(cache_path, "w", encoding="utf8") as f:
-            for example in data.values():
-                json.dump(example, f, ensure_ascii=False)
-                f.write("\n")
-
-    @staticmethod
-    def _create_possible_rules(node, sentence):
-        processor = LabelProcessor()
-
-        anchors = node["anchors"]
-        if len(anchors) == 0:
-            return [{"rule": processor.make_absolute_label_rule(node["label"].lower()), "anchor": None}]
-
-        rules = processor.gen_all_label_rules(
-            [sentence["input"][anchor] for anchor in anchors],
-            [sentence["lemmas"][anchor] for anchor in anchors],
-            node["label"],
-            separators=['', '+', '-'],
-            rule_classes=["absolute", "relative_forms", "relative_lemmas", "numerical_all"],
-            # separators=['', '-'],
-            # rule_classes=["absolute", "relative_forms", "numerical_all"],
-            concat=True,
-            allow_copy=False,
-            ignore_nonalnum=True,
-        )
-        return [{"rule": rule, "anchor": node["anchors"]} for rule in set(rules)]
 
     @staticmethod
     def node_similarity_key(node):

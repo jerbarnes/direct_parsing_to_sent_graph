@@ -23,6 +23,9 @@ from utility.permutation_generator import get_permutations
 from utility.bert_tokenizer import bert_tokenizer
 from utility.greedy_hitman import greedy_hitman
 
+import os
+os.environ["TOKENIZERS_PARALLELISM"] = "true"
+
 
 def load_dataset(path, framework, language=None):
     def condition(s, f, l):
@@ -40,7 +43,7 @@ def load_dataset(path, framework, language=None):
                     sentence["input"] = bytes(sentence["input"], 'utf-8').decode('utf-8', 'ignore')
 
                 if "nodes" not in sentence:
-                    continue
+                    sentence["nodes"] = []
 
                 for node in sentence["nodes"]:
                     if "properties" in node:
@@ -55,9 +58,9 @@ def load_dataset(path, framework, language=None):
     return data
 
 
-def add_companion(data, path, language: str):
+def add_companion(data, path, language: str, tokenization_mode="aggresive"):
     if path is None:
-        add_fake_companion(data, language)
+        add_fake_companion(data, language, tokenization_mode=tokenization_mode)
         return
 
     companion = {}
@@ -138,8 +141,8 @@ def add_companion(data, path, language: str):
     print(f"{error_count} erroneously matched sentences with companion")
 
 
-def add_fake_companion(data, language):
-    tokenizer = Tokenizer(data.values(), mode="aggressive")
+def add_fake_companion(data, language, tokenization_mode="aggresive"):
+    tokenizer = Tokenizer(data.values(), mode=tokenization_mode)
 
     for sample in list(data.values()):
         sample["sentence"] = sample["input"]
@@ -231,7 +234,7 @@ def anchor_ids_from_intervals(data):
 
 
 def tokenize(data, mode="aggressive"):
-    tokenizer = Tokenizer(data.values(), mode="aggressive")
+    tokenizer = Tokenizer(data.values(), mode=mode)
     for key in data.keys():
         data[key] = tokenizer(data[key])
         data[key] = tokenizer.clean(data[key])

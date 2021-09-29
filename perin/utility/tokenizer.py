@@ -18,7 +18,8 @@ class Tokenizer:
         self.parser = XMLParser()
         self.html_regex = re.compile(r"<\s*([a-zA-Z]+)[^>]*>(.*?)<\s*\/\s*\1>")
         self.wrong_count = 0
-        self.tokenizer = lambda s: s.split(' ') if mode == "space" else pyonmttok.Tokenizer(mode)
+        self.mode = mode
+        self.tokenizer = None if mode == "space" else pyonmttok.Tokenizer(mode)
 
     def create_tokens(self, sentence):
         new_tokens = [{"token": None, "span": {"from": float("-inf"), "to": 0}}]
@@ -67,7 +68,11 @@ class Tokenizer:
                     offset = end
 
             else:
-                tokens = self.tokenizer.tokenize(sentence["sentence"][span["from"]: span["to"]])[0]
+                if self.mode == "space":
+                    tokens = sentence["sentence"][span["from"]: span["to"]].split(' ')
+                else:
+                    tokens = self.tokenizer.tokenize(sentence["sentence"][span["from"]: span["to"]])[0]
+
                 for token in tokens:
                     if token != "":
                         start = offset + sentence["sentence"][offset:].find(token)
