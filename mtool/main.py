@@ -37,7 +37,7 @@ VALIDATIONS = {"input", "anchors", "edges",
                "amr", "eds", "sdp", "ucca"}
 
 def read_graphs(stream, format = None,
-                full = False, normalize = False, reify = False,
+                full = False, normalize = False, reify = False, node_centric = False,
                 frameworks = None, prefix = None, text = None, filter = None,
                 trace = 0, strict = 0, quiet = False, robust = False,
                 alignment = None, anchors = None, pretty = False,
@@ -72,7 +72,7 @@ def read_graphs(stream, format = None,
   elif format == "mrp":
     generator = codec.mrp.read(stream, text = text, robust = robust);
   elif format == "norec":
-    generator = codec.norec.read(stream, text = text, reify = reify, strict = strict);
+    generator = codec.norec.read(stream, text = text, reify = reify, strict = strict, node_centric = node_centric);
   elif format == "pmb":
     generator = codec.pmb.read(stream, full = full,
                                reify = reify, text = text,
@@ -137,6 +137,7 @@ def main():
   parser.add_argument("--normalize", action = "append", default = []);
   parser.add_argument("--full", action = "store_true");
   parser.add_argument("--reify", action = "store_true");
+  parser.add_argument("--node_centric", action = "store_true");
   parser.add_argument("--unique", action = "store_true");
   parser.add_argument("--ids", action = "store_true");
   parser.add_argument("--strings", action = "store_true");
@@ -286,7 +287,7 @@ def main():
                   reify = arguments.reify, frameworks = arguments.framework,
                   text = text, filter = filter, alignment = arguments.alignment,
                   anchors = arguments.anchors, pretty = arguments.pretty,
-                  trace = arguments.trace, strict = arguments.strict,
+                  trace = arguments.trace, strict = arguments.strict, node_centric = arguments.node_centric,
                   quiet = arguments.quiet, robust = arguments.robust,
                   id = arguments.id, n = arguments.n, i = arguments.i);
   if graphs is None:
@@ -345,7 +346,7 @@ def main():
     if arguments.format is None: arguments.format = arguments.read;
     gold, _ = read_graphs(arguments.gold, format = arguments.format,
                           full = arguments.full, normalize = normalize,
-                          reify = arguments.reify,
+                          reify = arguments.reify, node_centric = arguments.node_centric,
                           frameworks = arguments.framework,
                           text = text, filter = filter,
                           trace = arguments.trace, quiet = arguments.quiet,
