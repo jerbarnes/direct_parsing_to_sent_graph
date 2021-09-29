@@ -1,6 +1,0 @@
-[submodule "mtool"]
-	path = mtool
-	url = https://github.com/cfmrp/mtool
-[submodule "perin"]
-	path = perin
-	url = https://github.com/jerbarnes/perin
