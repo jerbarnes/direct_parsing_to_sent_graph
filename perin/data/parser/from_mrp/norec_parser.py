@@ -40,6 +40,7 @@ class NorecParser(AbstractParser):
             self.node_counter += 1
 
         utils.create_bert_tokens(self.data, args.encoder)
+        utils.create_edge_permutations(self.data, NorecParser.node_similarity_key)
 
         # create edge vectors
         for sentence in self.data.values():
