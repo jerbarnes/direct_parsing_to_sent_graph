@@ -411,10 +411,10 @@ def create_edges(sentence, attributes: bool, label_f=None, normalize=False):
     for e in sentence["edges"]:
         if normalize and "normal" in e:
             target, source = e["source"], e["target"]
-            label = e["normal"].lower()
+            label = e["normal"].lower() if "normal" in e else "none"
         else:
             source, target = e["source"], e["target"]
-            label = e["label"].lower()
+            label = e["label"].lower() if "label" in e else "none"
 
         if label_f is not None:
             label = label_f(label)
