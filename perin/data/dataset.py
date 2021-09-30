@@ -114,7 +114,7 @@ class Dataset:
             ("eds", "eng"): EDSParser,
             ("ptg", "eng"): PTGParser, ("ptg", "ces"): PTGParser,
             ("ucca", "eng"): UCCAParser, ("ucca", "deu"): UCCAParser,
-            ("norec", "nor"): NorecParser,
+            ("norec", "nor"): NorecParser, ("opener", "eng"): NorecParser,
         }[(framework, language)]
 
         self.train = dataset(
