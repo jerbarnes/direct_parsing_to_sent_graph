@@ -1,0 +1,4 @@
+frameworks:
+- ["opener", "eng"]
+
+encoder: xlm-roberta-base

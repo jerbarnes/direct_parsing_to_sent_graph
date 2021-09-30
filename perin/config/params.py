@@ -63,7 +63,8 @@ class Params:
             ("ucca", "eng"): f"{base_dir}/2020/cf/training/ucca.mrp",
             ("ucca", "deu"): f"{base_dir}/2020/cl/training/ucca.deu_train.mrp",
 
-            ("norec", "nor"): f"{base_dir}/node_centric_mrp/norec/train.mrp"
+            ("norec", "nor"): f"{base_dir}/node_centric_mrp/norec/train.mrp",
+            ("opener", "eng"): f"{base_dir}/node_centric_mrp/opener_en/train.mrp"
         }
 
         # path to the validation dataset
@@ -78,7 +79,8 @@ class Params:
             ("ucca", "eng"): f"{base_dir}/2020/cf/validation/ucca.mrp",
             ("ucca", "deu"): f"{base_dir}/2020/cl/training/ucca.deu_val.mrp",
 
-            ("norec", "nor"): f"{base_dir}/node_centric_mrp/norec/dev.mrp"
+            ("norec", "nor"): f"{base_dir}/node_centric_mrp/norec/dev.mrp",
+            ("opener", "eng"): f"{base_dir}/node_centric_mrp/opener_en/dev.mrp"
         }
 
         # path to the test dataset
@@ -93,7 +95,8 @@ class Params:
             ("ucca", "eng"): f"{base_dir}/2020/cf/evaluation/input.mrp",
             ("ucca", "deu"): f"{base_dir}/2020/cl/evaluation/input.mrp",
 
-            ("norec", "nor"): f"{base_dir}/node_centric_mrp/norec/test.mrp"
+            ("norec", "nor"): f"{base_dir}/node_centric_mrp/norec/test.mrp",
+            ("opener", "eng"): f"{base_dir}/node_centric_mrp/opener_en/test.mrp"
         }
 
         # path to udpipe companion data
