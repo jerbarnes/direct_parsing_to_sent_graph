@@ -17,7 +17,6 @@ import multiprocessing as mp
 import time
 from transformers import AutoTokenizer
 
-from utility.label_processor import LabelProcessor
 from utility.tokenizer import Tokenizer
 from utility.permutation_generator import get_permutations
 from utility.bert_tokenizer import bert_tokenizer
@@ -332,25 +331,6 @@ def get_smallest_rule_set(data, approximate: bool):
 
     print(f" -> time: {time.time() - start_time}")
     return best
-
-
-def change_unnecessary_relative_rules(data):
-    processor = LabelProcessor()
-
-    label_sets = {}
-    for n, _ in node_generator(data):
-        for rule in n["possible rules"]:
-            rule = rule["rule"]
-            if rule not in label_sets:
-                label_sets[rule] = set()
-            label_sets[rule].add(n["label"].lower())
-
-    for n, _ in node_generator(data):
-        for i, rule in enumerate(n["possible rules"]):
-            rule = rule["rule"]
-            if len(label_sets[rule]) == 1:
-                absolute_label = processor.make_absolute_label_rule(n['label'])
-                n["possible rules"][i] = {"rule": absolute_label, "anchor": None}
 
 
 def create_bert_tokens(data, encoder: str):

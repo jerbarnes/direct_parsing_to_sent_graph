@@ -33,7 +33,6 @@ from data.field.relative_label_field import RelativeLabelField
 from data.field.property_field import PropertyField
 from data.field.anchor_field import AnchorField
 from data.batch import Batch
-from utility.label_processor import LabelProcessor
 
 
 def char_tokenize(word):
@@ -49,7 +48,6 @@ class Collate:
 class Dataset:
     def __init__(self, args):
         self.sos, self.eos, self.pad, self.unk = "<sos>", "<eos>", "<pad>", "<unk>"
-        self.processor = LabelProcessor()
 
         self.bert_input_field = BertField()
         self.scatter_field = BasicField()
