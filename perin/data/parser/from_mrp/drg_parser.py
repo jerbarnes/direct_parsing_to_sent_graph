@@ -16,7 +16,6 @@ import os.path
 from collections import Counter
 from data.parser.from_mrp.abstract_parser import AbstractParser
 import utility.parser_utils as utils
-from utility.label_processor import LabelProcessor
 from utility.translator import Translator
 
 

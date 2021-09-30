@@ -9,17 +9,13 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import re
-from utility.xml_parser import XMLParser
-import pyonmttok
 
 
 class Tokenizer:
     def __init__(self, data, mode="aggresive"):
-        self.parser = XMLParser()
         self.html_regex = re.compile(r"<\s*([a-zA-Z]+)[^>]*>(.*?)<\s*\/\s*\1>")
         self.wrong_count = 0
         self.mode = mode
-        self.tokenizer = None if mode == "space" else pyonmttok.Tokenizer(mode)
 
     def create_tokens(self, sentence):
         new_tokens = [{"token": None, "span": {"from": float("-inf"), "to": 0}}]
@@ -48,39 +44,16 @@ class Tokenizer:
                 new_tokens.append({"token": None, "span": {"from": offset, "to": offset + space}})
 
             offset = span["from"]
-            if m["is_html"]:
-                for o in self.parser.feed(sentence["sentence"][span["from"]: span["to"]]):
-                    space = sentence["sentence"][offset:].find(o["word"])
-
-                    if space == -1:
-                        o["word"] = o["word"].replace('"', "&quot;")  # hack to make it work somehow
-                        space = sentence["sentence"][offset:].find(o["word"])
-                        if space == -1:
-                            self.wrong_count += 1
-                            space = 0
-
-                    if space > 1 or space == 1 and sentence["sentence"][offset] != " ":
-                        new_tokens.append({"token": None, "span": {"from": offset, "to": offset + space}})
-
-                    start = offset + space
-                    end = start + len(o["word"])
-                    new_tokens.append({"token": o, "span": {"from": start, "to": end}})
+            
+            tokens = sentence["sentence"][span["from"]: span["to"]].split(' ')
+            for token in tokens:
+                if token != "":
+                    start = offset + sentence["sentence"][offset:].find(token)
+                    end = start + len(token)
+                    new_tokens.append(
+                        {"token": {"word": token, "lemma": None}, "span": {"from": start, "to": end}}
+                    )
                     offset = end
-
-            else:
-                if self.mode == "space":
-                    tokens = sentence["sentence"][span["from"]: span["to"]].split(' ')
-                else:
-                    tokens = self.tokenizer.tokenize(sentence["sentence"][span["from"]: span["to"]])[0]
-
-                for token in tokens:
-                    if token != "":
-                        start = offset + sentence["sentence"][offset:].find(token)
-                        end = start + len(token)
-                        new_tokens.append(
-                            {"token": {"word": token, "lemma": None}, "span": {"from": start, "to": end}}
-                        )
-                        offset = end
 
         space = len(sentence["sentence"]) - offset
         if space > 1 or space == 1 and sentence["sentence"][offset] != " ":
