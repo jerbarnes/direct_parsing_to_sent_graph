@@ -350,7 +350,12 @@ def create_edge_permutations(data, similarity_key_f, MAX_LEN=2048):
     for sentence in data.values():
         groups = {}
         for i, node in enumerate(sentence["nodes"]):
-            key = similarity_key_f(node)
+            try:
+                key = similarity_key_f(node)
+            except:
+                print("ale vole to ne")
+                print(sentence)
+                exit()
             if key not in groups:
                 groups[key] = [i]
             else:
