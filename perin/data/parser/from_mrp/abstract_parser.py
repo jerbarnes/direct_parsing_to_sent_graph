@@ -28,9 +28,12 @@ class AbstractParser(torch.utils.data.Dataset):
 
         if filter_pred is not None:
             make_list = isinstance(self.examples, list)
+            if make_list:
+                print(f"# of sentences before filtering: {len(self.examples)}")
             self.examples = filter(filter_pred, self.examples)
             if make_list:
                 self.examples = list(self.examples)
+                print(f"# of sentences after filtering: {len(self.examples)}")
 
         self.fields = dict(fields)
 

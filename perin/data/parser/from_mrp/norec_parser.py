@@ -31,9 +31,6 @@ class NorecParser(AbstractParser):
         utils.add_companion(self.data, None, self.language, tokenization_mode="space")  # add empty companion
         utils.tokenize(self.data, mode="space")
 
-        # for d in self.data.values():
-        #     print(d)
-        #     exit()
         utils.anchor_ids_from_intervals(self.data)
 
         self.node_counter, self.edge_counter, self.no_edge_counter = 0, 0, 0
