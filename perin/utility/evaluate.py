@@ -12,6 +12,9 @@ import argparse
 import json
 import multiprocessing as mp
 
+import sys
+sys.path.insert(0, '..')
+sys.path.insert(0, '../mtool')
 import mtool.main
 import mtool.score.mces
 

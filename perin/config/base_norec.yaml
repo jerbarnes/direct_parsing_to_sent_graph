@@ -1,4 +1,4 @@
 frameworks:
 - ["norec", "nor"]
 
-encoder: xlm-roberta-base
+encoder: /cluster/projects/nn9851k/models/xlm-roberta-base

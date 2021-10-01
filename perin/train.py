@@ -34,7 +34,7 @@ from utility.loss_weight_learner import LossWeightLearner
 def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, default=None, help="path to config file")
-    parser.add_argument("--data_directory", type=str, default="/home/samueld/sent_graph_followup/data")
+    parser.add_argument("--data_directory", type=str, default="/cluster/projects/nn9851k/davisamu/sent_graph_followup/data")
     parser.add_argument("--dist_backend", default="nccl", type=str)
     parser.add_argument("--dist_url", default="localhost", type=str)
     parser.add_argument("--log_wandb", dest="log_wandb", action="store_true", default=False)
