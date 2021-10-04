@@ -86,3 +86,46 @@ def read(fp, text=None, reify=False, strict=False, node_centric=False):
                 "codec.norec.read(): ignoring {}: {}" "".format(native, error),
                 file=sys.stderr,
             )
+
+
+def get_text_span(node, text):
+    anchored_text = [text[anchor['from']:anchor['to']] for anchor in node.anchors]
+    anchors = [f"{anchor['from']}:{anchor['to']}" for anchor in node.anchors]
+    return anchored_text, anchors
+
+
+def write(graph, input, node_centric=False):
+    assert node_centric
+
+    # create opinions
+    opinions = {}
+    for node in graph.nodes:
+        if node.label in ["Source", "Target"]:
+            continue
+        opinions[node.id] = {
+            "Source": [[], []],
+            "Target": [[], []],
+            "Polar_expression": [*get_text_span(node, input)],
+            "Polarity": node.label,
+        }
+
+    # add sources & targets
+    for node in graph.nodes:
+        if node.label not in ["Source", "Target"]:
+            continue
+
+        anchored_text, anchors = get_text_span(node, input)
+
+        for edge in graph.edges:
+            if edge.tgt != node.id:
+                continue
+
+            opinions[edge.src][node.label][0] += anchored_text
+            opinions[edge.src][node.label][1] += anchors
+
+    sentence = {
+        "sent_id": graph.id,
+        "text": input,
+        "opinions": list(opinions.values()),
+    }
+    return sentence
