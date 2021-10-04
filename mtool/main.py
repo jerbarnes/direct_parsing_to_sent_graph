@@ -228,7 +228,7 @@ def main():
   if arguments.write is not None and \
      arguments.write not in \
      {"dot", "tikz", "displacy", "evaluation", "id", "json", "mrp",
-      "source", "targets", "txt", "ucca"}:
+      "source", "targets", "txt", "ucca", "norec"}:
     print("main.py(): invalid output format: {}; exit."
           "".format(arguments.write), file = sys.stderr);
     sys.exit(1);
@@ -472,12 +472,17 @@ def main():
       # Prints everything to one long file. To split to separate XML files, use, e.g.,
       # csplit -zk output.xml '/^<root/' -f '' -b '%02d.xml' {99}
       codec.ucca.write(graph, graph.input, file = arguments.output)
+
+  if arguments.write == "norec":
+    norec_graphs = [codec.norec.write(graph, graph.input, node_centric = arguments.node_centric) for graph in graphs]
+    json.dump(norec_graphs, arguments.output, indent=None)
+
   if arguments.overlay:
     for graph in overlays:
       if graph:
         json.dump(graph.encode(arguments.version), arguments.overlay,
                   indent = None, ensure_ascii = False);
         print(file = arguments.overlay);
-    
+
 if __name__ == "__main__":
   main();
