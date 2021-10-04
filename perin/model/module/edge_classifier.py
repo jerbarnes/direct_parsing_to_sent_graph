@@ -16,7 +16,7 @@ from model.module.grad_scaler import scale_grad
 
 
 class EdgeClassifier(nn.Module):
-    def __init__(self, dataset, args, initialize: bool, presence: bool, label: bool, attribute: bool):
+    def __init__(self, dataset, args, initialize: bool, presence: bool, label: bool):
         super(EdgeClassifier, self).__init__()
 
         self.presence = presence
@@ -39,30 +39,15 @@ class EdgeClassifier(nn.Module):
                 args.hidden_size, args.hidden_size_edge_label, n_labels, args.dropout_edge_presence, bias_init=label_init
             )
 
-        self.attribute = attribute
-        if self.attribute:
-            if len(dataset.edge_attribute_field.vocab) == 2:
-                n_attributes = 1
-                attribute_init = (dataset.edge_attribute_freqs[1:] / (1.0 - dataset.edge_attribute_freqs[1:])).log() if initialize else None
-            else:
-                n_attributes = len(dataset.edge_attribute_field.vocab)
-                attribute_init = dataset.edge_attribute_freqs.log() if initialize else None
-
-            self.edge_attribute = EdgeBiaffine(
-                args.hidden_size, args.hidden_size_edge_attribute, n_attributes, args.dropout_edge_attribute, bias_init=attribute_init
-            )
-
     def forward(self, x, loss_weights):
-        presence, label, attribute = None, None, None
+        presence, label = None, None
 
         if self.presence:
             presence = self.edge_presence(scale_grad(x, loss_weights["edge presence"])).squeeze(-1)  # shape: (B, T, T)
         if self.label:
             label = self.edge_label(scale_grad(x, loss_weights["edge label"]))  # shape: (B, T, T, O_1)
-        if self.attribute:
-            attribute = self.edge_attribute(scale_grad(x, loss_weights["edge attribute"]))  # shape: (B, T, T, O_2)
 
-        return presence, label, attribute
+        return presence, label
 
 
 class EdgeBiaffine(nn.Module):

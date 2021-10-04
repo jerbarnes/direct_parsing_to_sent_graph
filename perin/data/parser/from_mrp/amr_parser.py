@@ -62,7 +62,6 @@ class AMRParser(AbstractParser):
 
             sentence["anchor edges"] = [N, len(sentence["input"]), []]
             sentence["id"] = [sentence["id"]]
-            sentence["top"] = sentence["tops"][0]
             sentence["token anchors"] = [[]]
 
         self.anchor_freq = 0.0

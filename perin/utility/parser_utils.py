@@ -18,7 +18,6 @@ import time
 from transformers import AutoTokenizer
 
 from utility.tokenizer import Tokenizer
-from utility.permutation_generator import get_permutations
 from utility.bert_tokenizer import bert_tokenizer
 from utility.greedy_hitman import greedy_hitman
 
@@ -106,7 +105,6 @@ def add_companion(data, path, language: str, tokenization_mode="aggresive"):
 
                 last_start, last_end = start, end
 
-            data[l["id"]]["lemmas"] = [n["values"][n["properties"].index("lemma")] for n in l["nodes"]]
             data[l["id"]]["sentence"] = data[l["id"]]["input"]
 
             tokens = []
@@ -153,7 +151,6 @@ def add_fake_companion(data, language, tokenization_mode="aggresive"):
         spans = [t["span"] for t in token_objects]
 
         sample["input"] = tokens
-        sample["lemmas"] = tokens
         sample["token anchors"] = spans
 
 
@@ -239,100 +236,6 @@ def tokenize(data, mode="aggressive"):
         data[key] = tokenizer.clean(data[key])
 
 
-def create_possible_rules(data, applied_function, prune: bool, threads=4):
-    print(f"Generating possible rules using {threads} CPUs...", flush=True)
-    start_time = time.time()
-
-    # rule_counter = Counter()
-    # for node, sentence in node_generator(data):
-    #     node["possible rules"] = applied_function(node, sentence)
-    #     rule_counter.update((item["rule"] for item in node["possible rules"]))
-
-    # for n, _ in node_generator(data):
-    #     n["possible rules"] = [r for r in n["possible rules"] if rule_counter[r["rule"]] > 1 or r["rule"].startswith('a')]
-
-    # return
-
-    # results = [applied_function(node, sentence) for node, sentence in node_generator(data)]
-    with mp.Pool(processes=threads) as pool:
-        results = pool.starmap(applied_function, node_generator(data))
-
-    rule_domains = {}
-    for (node, sentence), rules in zip(node_generator(data), results):
-        node["possible rules"] = rules
-
-        if not prune:
-            continue
-
-        for rule in rules:
-            prefix = rule["rule"][0]
-            if prefix != 'l' and prefix != 'd':
-                rule_domains[rule["rule"]] = None
-                continue
-
-            if prefix == 'd':
-                anchors = tuple(sentence["input"][a].lower() for a in rule["anchor"])
-            else:
-                anchors = tuple(sentence["lemmas"][a].lower() for a in rule["anchor"])
-
-            domain = (prefix, node["label"].lower(), anchors)
-
-            if rule["rule"] not in rule_domains:
-                rule_domains[rule["rule"]] = {domain}
-            else:
-                rule_domains[rule["rule"]].add(domain)
-
-    if not prune:
-        return
-
-    print(f"Generated {len(rule_domains)} rules")
-    print(f"Pruning unnecessary rules...", flush=True)
-
-    rule_counter = Counter()
-    for node, _ in node_generator(data):
-        node["possible rules"] = [rule for rule in node["possible rules"] if rule["rule"] in rule_domains]
-        for rule in list(node["possible rules"]):
-            if rule["rule"][0] != 'l' and rule["rule"][0] != 'd':
-                rule_counter.update([rule["rule"]])
-                continue
-            if rule not in node["possible rules"]:
-                continue
-            for other_rule in node["possible rules"]:
-                if rule["rule"] == other_rule["rule"] or rule_domains[other_rule["rule"]] is None:
-                    continue
-                domain, other_domain = rule_domains[rule["rule"]], rule_domains[other_rule["rule"]]
-                if domain.issubset(other_domain) and (not domain.issubset(other_domain) or len(rule["rule"]) >= len(other_rule["rule"])):
-                    node["possible rules"] = [r for r in node["possible rules"] if r["rule"] != rule["rule"]]
-                    del rule_domains[rule["rule"]]
-                    break
-            else:
-                rule_counter.update([rule["rule"]])
-
-    print(f"Pruned to {len(rule_counter)} rules")
-    print("First 100 most common rules:")
-    for m in rule_counter.most_common(100):
-        print(f"    {m}")
-
-    print(f"Took {time.time() - start_time} s in total.")
-
-
-def get_smallest_rule_set(data, approximate: bool):
-    print("Solving SAT...", flush=True)
-
-    if approximate:
-        return greedy_hitman(data)
-
-    from pysat.examples.hitman import Hitman
-    start_time = time.time()
-
-    sets = [{rule["rule"] for rule in node["possible rules"]} for node, _ in node_generator(data)]
-    hitman = Hitman(bootstrap_with=sets, solver='g4', htype="sorted")
-    best = hitman.get()
-
-    print(f" -> time: {time.time() - start_time}")
-    return best
-
-
 def create_bert_tokens(data, encoder: str):
     tokenizer = AutoTokenizer.from_pretrained(encoder)
 
@@ -342,76 +245,11 @@ def create_bert_tokens(data, encoder: str):
         sentence["bert input"] = bert_input
 
 
-def create_edge_permutations(data, similarity_key_f, MAX_LEN=2048):
-    def permutation_count(groups):
-        return reduce(operator.mul, (math.factorial(len(g)) for g in groups), 1)
-
-    max_n_permutations, max_n_greedy = 1, 0
-    for sentence in data.values():
-        groups = {}
-        for i, node in enumerate(sentence["nodes"]):
-            try:
-                key = similarity_key_f(node)
-            except:
-                print("ale vole to ne")
-                print(sentence)
-                exit()
-            if key not in groups:
-                groups[key] = [i]
-            else:
-                groups[key].append(i)
-
-        groups = sorted(groups.values(), key=lambda g: len(g))
-        greedy_groups = []
-        n_permutations = permutation_count(groups)
-        max_n_permutations = max(max_n_permutations, n_permutations)
-
-        while n_permutations > MAX_LEN:
-            groups = [[i] for i in groups[-1]] + groups
-            greedy_groups.append(groups.pop(-1))
-            n_permutations = permutation_count(groups)
-
-        max_n_greedy = max(max_n_greedy, sum(len(g) for g in greedy_groups))
-        permutations = get_permutations(groups)
-        sentence["edge permutations"] = {"permutations": permutations, "greedy": greedy_groups}
-
-    print(f"Max number of permutations to resolve assignment ambiguity: {max_n_permutations}")
-    print(f"... reduced to {min(max_n_permutations, MAX_LEN)} permutations with max of {max_n_greedy} greedily resolved assignments")
-
-
-def assign_labels_as_best_rules(data, rule_counter):
-    for n, _ in node_generator(data):
-        possible_rules = set(rule[-1] for rule in n["possible rules"][-1])
-        if len(possible_rules) > 0:
-            n["label"] = max((rule for rule in possible_rules), key=lambda r: rule_counter[r])
-        else:
-            n["label"] = "<unk>"
-
-
-def count_rules(data, label_smoothing):
-    rule_counter = Counter({rule[-1]: 0.0 for n, _ in node_generator(data) for rule in n["possible rules"][-1]})
-
-    n_nodes = 0
-    for node, _ in node_generator(data):
-        rules = {rule[-1] for rule in node["possible rules"][-1]}
-        for rule in rules:
-            rule_counter[rule] += 1 / len(rules)
-        n_nodes += 1
-
-    rule_p = 1 - label_smoothing
-    non_rule_p = label_smoothing / (len(rule_counter) - 1)
-
-    for rule in rule_counter.keys():
-        rule_counter[rule] = rule_counter[rule] * rule_p + (n_nodes - rule_counter[rule]) * non_rule_p
-    return rule_counter
-
-
-def create_edges(sentence, attributes: bool, label_f=None, normalize=False):
+def create_edges(sentence, label_f=None, normalize=False):
     N = len(sentence["nodes"])
 
     sentence["edge presence"] = [N, N, []]
     sentence["edge labels"] = [N, N, []]
-    sentence["edge attributes"] = [N, N, []]
 
     for e in sentence["edges"]:
         if normalize and "normal" in e:
@@ -427,37 +265,5 @@ def create_edges(sentence, attributes: bool, label_f=None, normalize=False):
         sentence["edge presence"][-1].append((source, target, 1))
         sentence["edge labels"][-1].append((source, target, label))
 
-        if attributes:
-            attribute = "<NONE>" if "attributes" not in e else e["attributes"][0]
-            sentence["edge attributes"][-1].append((source, target, attribute))
-
     edge_counter = len(sentence["edge presence"][-1])
     return edge_counter
-
-
-def create_aligned_rules(data, constrained_anchors: bool):
-    for node, sentence in node_generator(data):
-        possible_rules = []
-
-        if constrained_anchors:
-            anchors = node["anchors"] if len(node["anchors"]) > 0 else range(len(sentence["input"]))
-            for anchor in anchors:
-                for rule in node["possible rules"]:
-                    possible_rules.append((anchor, len(node["possible rules"]), rule["rule"]))
-            node["possible rules"] = [len(sentence["input"]), possible_rules]
-
-            continue
-
-        for rule in node["possible rules"]:
-            if rule["anchor"] is not None and not rule["rule"].startswith('a'):
-                assert len(rule["anchor"]) == 1
-                possible_rules.append((rule["anchor"][0], rule["rule"]))
-                continue
-            for anchor in range(len(sentence["input"])):
-                possible_rules.append((anchor, rule["rule"]))
-        node["possible rules"] = possible_rules
-
-        possible_rules = []
-        for rule in node["possible rules"]:
-            possible_rules.append((rule[0], len([r for r in node["possible rules"] if r[0] == rule[0]]), rule[1]))
-        node["possible rules"] = [len(sentence["input"]), possible_rules]

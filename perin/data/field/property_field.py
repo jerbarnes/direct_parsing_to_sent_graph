@@ -44,6 +44,9 @@ class PropertyField(RawField):
                     output.append(self.vocabs[key].stoi[array[key]])
             return output
 
+        if arr == []:
+            return [[]]
+
         return multi_stoi(arr)
 
     def build_vocab(self, *args):

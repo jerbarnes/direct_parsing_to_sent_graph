@@ -10,6 +10,9 @@
 
 import argparse
 import os
+import datetime
+import socket
+from contextlib import closing
 
 import torch
 import torch.multiprocessing as mp
@@ -37,11 +40,12 @@ def parse_arguments():
     parser.add_argument("--data_directory", type=str, default="/cluster/projects/nn9851k/davisamu/sent_graph_followup/data")
     parser.add_argument("--dist_backend", default="nccl", type=str)
     parser.add_argument("--dist_url", default="localhost", type=str)
-    parser.add_argument("--log_wandb", dest="log_wandb", action="store_true", default=False)
-    parser.add_argument("--name", default="default", type=str, help="name of this run.")
+    parser.add_argument("--home_directory", type=str, default="/cluster/projects/nn9851k/davisamu/sent_graph_followup/data")
+    parser.add_argument("--name", default="test", type=str, help="name of this run.")
     parser.add_argument("--save_checkpoints", dest="save_checkpoints", action="store_true", default=False)
+    parser.add_argument("--log_wandb", dest="log_wandb", action="store_true", default=False)
     parser.add_argument("--wandb_log_mode", type=str, default=None, help="How to log the model weights, supported values: {'all', 'gradients', 'parameters', None}")
-    parser.add_argument("--workers", type=int, default=2, help="number of CPU workers per GPU.")
+    parser.add_argument("--workers", type=int, default=1, help="number of CPU workers per GPU.")
     args = parser.parse_args()
 
     params = Params()
@@ -55,13 +59,20 @@ def parse_arguments():
     return params
 
 
-def main_worker(gpu, n_gpus_per_node, args):
-    is_master = gpu == 0
-    directory = initialize(args, create_directory=is_master, init_wandb=args.log_wandb and is_master)
+def find_free_port(dist_url):
+    with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
+        s.bind((dist_url, 0))
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        return s.getsockname()[1]
 
-    os.environ["MASTER_ADDR"] = "localhost"
+
+def main_worker(gpu, n_gpus_per_node, master_port, directory, args):
+    is_master = gpu == 0
+    initialize(args, init_wandb=args.log_wandb)
+
+    os.environ["MASTER_ADDR"] = args.dist_url
     if "MASTER_PORT" not in os.environ:
-        os.environ["MASTER_PORT"] = "12345"
+        os.environ["MASTER_PORT"] = str(master_port)
 
     if args.distributed:
         dist.init_process_group(backend=args.dist_backend, init_method="env://", world_size=n_gpus_per_node, rank=gpu)
@@ -76,20 +87,17 @@ def main_worker(gpu, n_gpus_per_node, args):
     optimizer = AdamW(parameters, betas=(0.9, args.beta_2))
     scheduler = multi_scheduler_wrapper(optimizer, args)
     autoclip = AutoClip([p for name, p in model.named_parameters() if "loss_weights" not in name])
-    if args.balance_loss_weights:
-        loss_weight_learner = LossWeightLearner(args, model, n_gpus_per_node)
+    loss_weight_learner = LossWeightLearner(args, model, n_gpus_per_node)
 
     if is_master:
-        if args.log_wandb:
-            import wandb
-            wandb.watch(model, log=args.wandb_log_mode)
-        print(f"\nmodel: {model}\n")
+        print(f"\nmodel: {model}\n", flush=True)
         log = Log(dataset, model, optimizer, args, directory, log_each=10, log_wandb=args.log_wandb)
 
-    torch.cuda.set_device(gpu)
-    model = model.cuda(gpu)
+    device = torch.device(f"cuda:{gpu}" if torch.cuda.is_available() else "cpu")
+    model = model.to(device)
 
     if args.distributed:
+        torch.cuda.set_device(gpu)
         model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[gpu])
         raw_model = model.module
     else:
@@ -109,7 +117,7 @@ def main_worker(gpu, n_gpus_per_node, args):
         model.zero_grad()
 
         for batch in dataset.train:
-            batch = Batch.to(batch, gpu)
+            batch = Batch.to(batch, device)
             total_loss, losses, stats = model(batch)
 
             for head in raw_model.heads:
@@ -149,7 +157,7 @@ def main_worker(gpu, n_gpus_per_node, args):
         with torch.no_grad():
             for batch in dataset.val:
                 try:
-                    _, _, stats = model(Batch.to(batch, gpu))
+                    _, _, stats = model(Batch.to(batch, device))
 
                     batch_size = batch["every_input"][0].size(0)
                     log(batch_size, stats, args.frameworks)
@@ -166,24 +174,32 @@ def main_worker(gpu, n_gpus_per_node, args):
         #
         # VALIDATION MRP-SCORES
         #
-        predict(raw_model, dataset.val, args.validation_data, args, directory, gpu, run_evaluation=True, epoch=epoch)
+
+        predict(raw_model, dataset.val, args.validation_data, args.raw_validation_data, args, log, directory, gpu, epoch=epoch)
 
     #
     # TEST PREDICTION
     #
-    os.mkdir(f"{directory}/test_predictions/")
-    predict(raw_model, dataset.test, args.test_data, args, f"{directory}/test_predictions/", gpu)
+    # os.mkdir(f"{directory}/test_predictions/")
+    # predict(raw_model, dataset.test, args.test_data, args, f"{directory}/test_predictions/", device)
 
 
 if __name__ == "__main__":
     args = parse_arguments()
 
+    timestamp = f"{datetime.datetime.today():%m-%d-%y_%H-%M-%S}"
+    directory = f"/cluster/home/davisamu/home/sent_graph_followup/perin/outputs/test_{timestamp}"
+    os.mkdir(directory)
+    os.mkdir(f"{directory}/test_predictions")
+
     n_gpu = torch.cuda.device_count()
     args.distributed = n_gpu > 1
     args.batch_size = args.batch_size // max(n_gpu, 1)
+#    print("number of accumulation steps", args.accumulation_steps, flush=True)
 
     if args.distributed:
-        mp.spawn(main_worker, nprocs=n_gpu, args=(n_gpu, args), join=True)
+        master_port = find_free_port(args.dist_url)
+        mp.spawn(main_worker, nprocs=n_gpu, args=(n_gpu, master_port, directory, args), join=True)
         dist.destroy_process_group()
     else:
-        main_worker(0, 1, args)
+        main_worker(0, 1, -1, directory, args)

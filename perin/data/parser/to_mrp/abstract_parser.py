@@ -44,10 +44,6 @@ class AbstractParser:
 
         prediction["edge presence"] = prediction["edge presence"][non_properties, :][:, non_properties]
         prediction["edge labels"] = prediction["edge labels"][non_properties, :][:, non_properties]
-        if "edge attributes" in prediction and prediction["edge attributes"] is not None:
-            prediction["edge attributes"] = prediction["edge attributes"][non_properties, :][:, non_properties]
-        if "tops" in prediction and prediction["tops"] is not None:
-            prediction["tops"] = prediction["tops"][non_properties]
         if "anchors" in prediction and prediction["anchors"] is not None:
             prediction["anchors"] = [prediction["anchors"][i] for i in non_properties]
 
@@ -84,11 +80,6 @@ class AbstractParser:
         label = self.get_edge_label(prediction, source, target)
         edge = {"source": source, "target": target, "label": label}
 
-        attribute = self.get_edge_attribute(prediction, source, target)
-        if attribute is not None:
-            edge["attributes"] = [attribute]
-            edge["values"] = [True]
-
         edges.append(edge)
 
     def create_anchors(self, prediction, nodes, join_contiguous=True, at_least_one=False, single_anchor=False):
@@ -120,17 +111,5 @@ class AbstractParser:
 
         return nodes
 
-    def create_top(self, prediction, nodes):
-        return [prediction["tops"][:len(nodes)].argmax().item()]
-
     def get_edge_label(self, prediction, source, target):
         return self.dataset.edge_label_field.vocab.itos[prediction["edge labels"][source, target].item()]
-
-    def get_edge_attribute(self, prediction, source, target):
-        if "edge attributes" not in prediction or prediction["edge attributes"] is None:
-            return None
-
-        attribute = self.dataset.edge_attribute_field.vocab.itos[prediction["edge attributes"][source, target].item()]
-        if attribute.lower() == "<none>":
-            return None
-        return attribute

@@ -70,14 +70,13 @@ class Encoder(nn.Module):
         self.use_char_embedding = args.char_embedding
         if self.use_char_embedding:
             self.form_char_embedding = CharEmbedding(dataset.char_form_vocab_size, args.char_embedding_size, self.dim)
-            self.lemma_char_embedding = CharEmbedding(dataset.char_lemma_vocab_size, args.char_embedding_size, self.dim)
             self.word_dropout = WordDropout(args.dropout_word)
 
         self.query_generator = QueryGenerator(self.dim, self.width_factor, len(args.frameworks))
         self.encoded_layer_norm = nn.LayerNorm(self.dim)
         self.scores = nn.Parameter(torch.zeros(self.n_layers, 1, 1, 1), requires_grad=True)
 
-    def forward(self, bert_input, form_chars, lemma_chars, to_scatter, n_words, frameworks):
+    def forward(self, bert_input, form_chars, to_scatter, n_words, frameworks):
         tokens, mask = bert_input
         batch_size = tokens.size(0)
 
@@ -106,7 +105,6 @@ class Encoder(nn.Module):
 
         if self.use_char_embedding:
             form_char_embedding = self.form_char_embedding(form_chars[0], form_chars[1], form_chars[2])
-            lemma_char_embedding = self.lemma_char_embedding(lemma_chars[0], lemma_chars[1], lemma_chars[2])
-            encoder_output = self.word_dropout(encoder_output) + form_char_embedding + lemma_char_embedding
+            encoder_output = self.word_dropout(encoder_output) + form_char_embedding
 
         return encoder_output, decoder_input

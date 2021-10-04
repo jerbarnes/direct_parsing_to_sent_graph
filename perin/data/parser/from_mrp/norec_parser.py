@@ -36,17 +36,24 @@ class NorecParser(AbstractParser):
         self.node_counter, self.edge_counter, self.no_edge_counter = 0, 0, 0
         anchor_count, n_node_token_pairs = 0, 0
 
+        unlabeled_count = 0
         for node, sentence in utils.node_generator(self.data):
+            if "label" not in node:
+                node["label"] = "Null"
+                unlabeled_count += 1
+            node["properties"] = {"dummy": 0}
+
             self.node_counter += 1
+        print(f"Number of unlabeled nodes: {unlabeled_count}", flush=True)
 
         utils.create_bert_tokens(self.data, args.encoder)
-        utils.create_edge_permutations(self.data, NorecParser.node_similarity_key)
 
         # create edge vectors
         for sentence in self.data.values():
+            sentence["language"] = language  # just to get through the later checks...
             N = len(sentence["nodes"])
 
-            edge_count = utils.create_edges(sentence, attributes=False, normalize=False)
+            edge_count = utils.create_edges(sentence, normalize=False)
             self.edge_counter += edge_count
             self.no_edge_counter += N * (N - 1) - edge_count
 
@@ -59,7 +66,6 @@ class NorecParser(AbstractParser):
                 n_node_token_pairs += len(sentence["input"])
 
             sentence["id"] = [sentence["id"]]
-            sentence["top"] = 0  # we don't need it for Norec
 
         self.anchor_freq = anchor_count / n_node_token_pairs
         self.input_count = sum(len(sentence["input"]) for sentence in self.data.values())

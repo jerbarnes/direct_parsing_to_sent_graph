@@ -1,25 +1,21 @@
-#!/usr/bin/env python3
-# conding=utf-8
-#
-# Copyright 2020 Institute of Formal and Applied Linguistics, Faculty of
-# Mathematics and Physics, Charles University, Czech Republic.
-#
-# This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
-
+import os
 import json
 import torch
+import wandb
+
+from PIL import Image
+from subprocess import run
 
 from data.batch import Batch
 from utility.evaluate import evaluate
+from utility.utils import resize_to_square
 
 
 def sentence_condition(s, f, l):
     return ("framework" not in s or f == s["framework"]) and ("framework" in s or f in s["targets"])
 
 
-def predict(model, data, input_paths, args, output_directory, gpu, run_evaluation=False, epoch=None):
+def predict(model, data, input_paths, raw_input_paths, args, logger, output_directory, gpu, epoch=None):
     model.eval()
     input_files = {(f, l): input_paths[(f, l)] for f, l in args.frameworks}
 
@@ -49,17 +45,15 @@ def predict(model, data, input_paths, args, output_directory, gpu, run_evaluatio
                     sentences[(framework, language)][prediction["id"]][key] = value
 
     for framework, language in args.frameworks:
-        output_path = f"{output_directory}/prediction_{framework}_{language}.json"
+        output_path = f"{output_directory}/prediction_{epoch}_{framework}_{language}.json"
         with open(output_path, "w", encoding="utf8") as f:
             for sentence in sentences[(framework, language)].values():
                 json.dump(sentence, f, ensure_ascii=False)
                 f.write("\n")
                 f.flush()
 
-        if args.log_wandb:
-            import wandb
-            wandb.save(output_path)
-
-        if run_evaluation:
-            # this should be run in parallel, if your setup allows it
-            evaluate(output_directory, epoch, framework, language, input_files[(framework, language)])
+        score = run(["./evaluate.sh", output_path, raw_input_paths[(framework, language)]], capture_output=True, text=True)
+        print(score.stdout, flush=True)
+        print(score.stderr, flush=True)
+        score = float(score.stdout[len("Sentiment Tuple F1: "):-1])
+        logger.log_evaluation(score, framework, language)

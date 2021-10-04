@@ -65,7 +65,6 @@ class Log:
         else:
             self._eval_step(batch_size, losses)
 
-        self._check_for_evaluation(frameworks)
         self.flushed = False
 
     def flush(self) -> None:
@@ -74,75 +73,34 @@ class Log:
         self.flushed = True
 
         if self.is_train:
-            print(f"\r┃{self.epoch:12d}  ┃{self._time():>12}  ┃", end="", flush=True)
+            print(f"\r┃{self.epoch:12d}  ┃{self._time():>12}  │", end="", flush=True)
         else:
             if self.losses is not None and self.log_wandb:
-                dictionary = {f"validation {key}": value / self.step for key, value in self.losses.items()}
+                dictionary = {f"validation/{key}": value / self.step for key, value in self.losses.items()}
                 dictionary["epoch"] = self.epoch
                 wandb.log(dictionary)
 
             self.losses = None
             # self._save_model(save_as_best=False, performance=None)
 
-    def _check_for_evaluation(self, frameworks):
-        for framework, language in frameworks:
-            evaluation_results = self.evaluation_results.format(framework, language)
-            full_evaluation_results = self.full_evaluation_results.format(framework, language)
+    def log_evaluation(self, f1_score, framework, language):
+        if self.log_wandb:
+            wandb.log({"validation/sentiment_tuple_f1": f1_score})
 
-            if not os.path.exists(evaluation_results):
-                continue
+        if f1_score > self.best_f1_score:
+            if self.log_wandb:
+                wandb.run.summary["best sentiment tuple f1 score"] = f1_score
+                self.best_f1_score = f1_score
+                self._save_model(save_as_best=True, f1_score=f1_score)
 
-            try:
-                with open(evaluation_results, mode="r") as f:
-                    results = json.loads(f.readline())
-                if "epoch" in results:
-                    epoch = results["epoch"]
-                    wandb.save(full_evaluation_results)
-                    wandb.log(results)
-                    os.remove(evaluation_results)
-                else:
-                    continue
-            except:
-                continue
-
-            try:
-                with open(full_evaluation_results, mode="r") as f:
-                    results = json.loads(f.readline())
-            except:
-                continue
-
-            self.result_history[epoch][(framework, language)] = results
-
-            if len(self.result_history[epoch]) == self.n_frameworks:
-                keys = ["tops", "labels", "properties", "anchors", "edges", "attributes", "all"]
-                f = {key: 0.0 for key in keys}
-                total = {key: 0 for key in keys}
-
-                for result in self.result_history[epoch].values():
-                    for key in keys:
-                        f[key] += result[key]["g"] * result[key]["f"]
-                        total[key] += result[key]["g"]
-                del self.result_history[epoch]
-
-                results = {f"evaluation {key} f1": f[key] / max(total[key], 1) for key in keys}
-                results["epoch"] = epoch
-                wandb.log(results)
-
-                f1_score = results[f"evaluation all f1"]
-                if f1_score > self.best_f1_score:
-                    if self.log_wandb:
-                        wandb.run.summary["best f1 score"] = f1_score
-                    self.best_f1_score = f1_score
-                    self._save_model(save_as_best=True, performance=results)
-
-    def _save_model(self, save_as_best: bool, performance: dict):
+    def _save_model(self, save_as_best: bool, f1_score: float):
         if not self.args.save_checkpoints:
             return
 
         state = {
             "epoch": self.epoch,
             "dataset": self.dataset.state_dict(),
-            "performance": performance,
+            "f1_score": f1_score,
             "model": self.model.state_dict(),
             "optimizer": self.optimizer.state_dict(),
             "args": self.args.state_dict(),
@@ -172,11 +130,11 @@ class Log:
             print(f"\r┃{self.epoch:12d}  │{self._time():>12}  {self.loading_bar(progress)}", end="", flush=True)
 
             if self.log_wandb:
-                dictionary = {f"train {key}": value / self.log_each for key, value in self.losses.items()}
+                dictionary = {f"train/{key}" if not key.startswith("weight/") else key: value / self.log_each for key, value in self.losses.items()}
                 dictionary["epoch"] = self.epoch
-                dictionary["learning rate - encoder"] = learning_rates[-3]
-                dictionary["learning rate - decoder"] = learning_rates[-2]
-                dictionary["learning rate - grad_norm"] = learning_rates[-1]
+                dictionary["learning_rate/encoder"] = learning_rates[-3]
+                dictionary["learning_rate/decoder"] = learning_rates[-2]
+                dictionary["learning_rate/grad_norm"] = learning_rates[-1]
                 dictionary["gradient norm"] = grad_norm
 
                 wandb.log(dictionary)

@@ -8,6 +8,7 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -15,12 +16,10 @@ import torch.nn.functional as F
 from model.module.edge_classifier import EdgeClassifier
 from model.module.anchor_classifier import AnchorClassifier
 from model.module.padding_packer import PaddingPacker
-from model.module.mixture_of_softmaxes import MixtureOfSoftmaxes
 from model.module.grad_scaler import scale_grad
 from model.module.cross_entropy import multi_label_cross_entropy, cross_entropy, binary_cross_entropy
-from utility.hungarian_matching import get_matching, reorder, match_smoothed_label, match_anchor
+from utility.hungarian_matching import get_matching, reorder, match_anchor, match_label
 from utility.utils import create_padding_mask
-from utility.permutation_generator import permute_edges
 
 
 class AbstractHead(nn.Module):
@@ -28,12 +27,19 @@ class AbstractHead(nn.Module):
         super(AbstractHead, self).__init__()
 
         self.loss_weights = self.init_loss_weights(config)
+        self.preference_weights = {}
+        self.loss_0 = {}
 
         self.edge_classifier = self.init_edge_classifier(dataset, args, config, initialize)
         self.label_classifier = self.init_label_classifier(dataset, args, config, initialize)
-        self.top_classifier = self.init_top_classifier(dataset, args, config, initialize)
         self.property_classifier = self.init_property_classifier(dataset, args, config, initialize)
         self.anchor_classifier = self.init_anchor_classifier(dataset, args, config, initialize)
+
+        print(self.loss_0, flush=True)
+        s = sum(self.preference_weights.values())
+        for k in self.preference_weights.keys():
+            self.preference_weights[k] /= s
+        print(self.preference_weights, flush=True)
 
         self.query_length = args.query_length
         self.label_smoothing = args.label_smoothing
@@ -52,13 +58,24 @@ class AbstractHead(nn.Module):
 
         cost_matrices = self.create_cost_matrices(output, batch, decoder_lens)
         matching = get_matching(cost_matrices)
-        decoder_output = reorder(decoder_output, matching, batch["properties"].size(1))
+        decoder_output = reorder(decoder_output, matching, batch["labels"][0].size(1))
 
         output["property"] = self.forward_property(decoder_output)
-        output["top"] = self.forward_top(decoder_output)
-        output["edge presence"], output["edge label"], output["edge attribute"] = self.forward_edge(decoder_output)
+        output["edge presence"], output["edge label"] = self.forward_edge(decoder_output)
 
+        #try:
         return self.loss(output, batch, matching, decoder_mask)
+        # except:
+        #     print(batch)
+        #     print()
+        #     print(output)
+        #     print()
+        #     print(decoder_mask)
+        #     print()
+        #     print(matching)
+        #     print()
+        #     print(decoder_output.shape)
+        #     exit()
 
     def predict(self, encoder_output, decoder_output, encoder_mask, decoder_mask, batch, **kwargs):
         every_input, word_lens = batch["every_input"]
@@ -72,13 +89,13 @@ class AbstractHead(nn.Module):
         for b in range(batch_size):
             label_indices = self.inference_label(label_pred[b, :decoder_lens[b], :]).cpu()
             for t in range(label_indices.size(0)):
-                relative_label_index = label_indices[t].item()
-                if relative_label_index == 0:
+                label_index = label_indices[t].item()
+                if label_index == 0:
                     continue
 
                 decoder_output[b, len(labels[b]), :] = decoder_output[b, t, :]
 
-                labels[b].append(relative_label_index)
+                labels[b].append(label_index)
                 if anchor_pred is None:
                     anchors[b].append(list(range(t // self.query_length, word_lens[b])))
                 else:
@@ -87,8 +104,7 @@ class AbstractHead(nn.Module):
         decoder_output = decoder_output[:, : max(len(l) for l in labels), :]
 
         properties = self.forward_property(decoder_output)
-        tops = self.forward_top(decoder_output)
-        edge_presence, edge_labels, edge_attributes = self.forward_edge(decoder_output)
+        edge_presence, edge_labels = self.forward_edge(decoder_output)
 
         outputs = [
             self.parser.parse(
@@ -96,12 +112,9 @@ class AbstractHead(nn.Module):
                     "labels": labels[b],
                     "anchors": anchors[b],
                     "properties": self.inference_property(properties, b),
-                    "tops": self.inference_top(tops, b),
                     "edge presence": self.inference_edge_presence(edge_presence, b),
                     "edge labels": self.inference_edge_label(edge_labels, b),
-                    "edge attributes": self.inference_edge_attribute(edge_attributes, b),
                     "id": batch["id"][b].cpu(),
-                    "lemmas": batch["every_lemma"][b, : word_lens[b]].cpu(),
                     "tokens": batch["every_input"][0][b, : word_lens[b]].cpu(),
                     "token intervals": batch["token_intervals"][b, :, :].cpu(),
                 },
@@ -124,7 +137,6 @@ class AbstractHead(nn.Module):
         edge_mask = edge_mask | label_mask.unsqueeze(1) | label_mask.unsqueeze(2)  # shape: (B, T_label, T_label)
         edge_label_mask = (batch["edge_presence"] == 0) | edge_mask
 
-        permute_edges(batch, output["edge presence"], edge_mask)
         if output["edge label"] is not None:
             batch["edge_labels"] = (
                 batch["edge_labels"][0][:, :, :, :output["edge label"].size(-1)],
@@ -136,24 +148,23 @@ class AbstractHead(nn.Module):
         losses.update(self.loss_anchor(output, batch, input_mask, matching))
         losses.update(self.loss_edge_presence(output, batch, edge_mask))
         losses.update(self.loss_edge_label(output, batch, edge_label_mask.unsqueeze(-1)))
-        losses.update(self.loss_edge_attribute(output, batch, edge_label_mask))
         losses.update(self.loss_property(output, batch, label_mask))
-        losses.update(self.loss_top(output, batch, label_mask))
 
-        stats = {f"{key} {self.language}-{self.framework}": value.detach().cpu().item() for key, value in losses.items()}
-        total_loss = sum(losses[key] * self.loss_weights[key] for key in losses.keys())
+        stats = {f"{key}": value.detach().cpu().item() for key, value in losses.items()}
+        total_loss = sum(losses.values())
 
         return total_loss, losses, stats
 
     @torch.no_grad()
     def create_cost_matrices(self, output, batch, decoder_lens):
-        batch_size = len(batch["relative_labels"][1])
+        batch_size = len(batch["labels"][1])
         decoder_lens = decoder_lens.cpu()
 
         matrices = []
         for b in range(batch_size):
             label_cost_matrix = self.label_cost_matrix(output, batch, decoder_lens, b)
             anchor_cost_matrix = self.anchor_cost_matrix(output, batch, decoder_lens, b)
+
             cost_matrix = label_cost_matrix * anchor_cost_matrix
             matrices.append(cost_matrix.cpu())
 
@@ -164,35 +175,55 @@ class AbstractHead(nn.Module):
         return nn.ParameterDict({k: nn.Parameter(torch.tensor([default_weight])) for k, v in config.items() if v})
 
     def init_edge_classifier(self, dataset, args, config, initialize: bool):
-        if not config["edge presence"] and not config["edge label"] and not config["edge attribute"]:
+        if not config["edge presence"] and not config["edge label"]:
             return None
-        return EdgeClassifier(dataset, args, initialize, presence=config["edge presence"], label=config["edge label"], attribute=config["edge attribute"])
+        if config["edge presence"]:
+            self.preference_weights["edge presence"] = dataset.edge_count / math.sqrt(2)
+            self.loss_0["edge presence"] = torch.distributions.bernoulli.Bernoulli(dataset.edge_presence_freq).entropy()
+        if config["edge label"]:
+            self.preference_weights["edge label"] = dataset.edge_count / math.sqrt(2)
+            self.loss_0["edge label"] = torch.distributions.categorical.Categorical(dataset.edge_label_freqs).entropy() / 2
+
+        return EdgeClassifier(dataset, args, initialize, presence=config["edge presence"], label=config["edge label"])
 
     def init_label_classifier(self, dataset, args, config, initialize: bool):
         if not config["label"]:
             return None
-        return PaddingPacker(nn.Sequential(nn.Dropout(args.dropout_label), MixtureOfSoftmaxes(dataset, args, initialize)))
 
-    def init_top_classifier(self, dataset, args, config, initialize: bool):
-        if not config["top"]:
-            return None
-        return nn.Sequential(nn.Dropout(args.dropout_top), nn.Linear(args.hidden_size, 1, bias=False))
+        self.preference_weights["label"] = dataset.node_count / math.sqrt(2)
+        self.loss_0["label"] = torch.distributions.categorical.Categorical(dataset.label_freqs).entropy() / 2
+
+        classifier = nn.Sequential(
+            nn.Dropout(args.dropout_label),
+            nn.Linear(args.hidden_size, len(dataset.label_field.vocab) + 1, bias=True)
+        )
+        if initialize:
+            classifier[1].bias.data = dataset.label_freqs.log()
+
+        return PaddingPacker(classifier)
 
     def init_property_classifier(self, dataset, args, config, initialize: bool):
         if not config["property"]:
             return None
+
+        self.preference_weights["property"] = dataset.property_field.vocabs["transformed"].freqs[dataset.property_field.vocabs["transformed"].stoi[1]]
 
         classifier = nn.Sequential(nn.Dropout(args.dropout_property), nn.Linear(args.hidden_size, 1))
 
         if initialize:
             property_freq = dataset.property_freqs["transformed"][dataset.property_field.vocabs["transformed"].stoi[1]]
             classifier[1].bias.data.fill_((property_freq / (1.0 - property_freq)).log())
+            self.loss_0["property"] = torch.distributions.bernoulli.Bernoulli(property_freq).entropy()
 
         return classifier
 
     def init_anchor_classifier(self, dataset, args, config, initialize: bool):
         if not config["anchor"]:
             return None
+
+        self.preference_weights["anchor"] = dataset.node_count / math.sqrt(2)
+        self.loss_0["anchor"] = torch.distributions.bernoulli.Bernoulli(dataset.anchor_freq).entropy()
+
         return AnchorClassifier(dataset, args, initialize)
 
     def forward_edge(self, decoder_output):
@@ -205,12 +236,6 @@ class AbstractHead(nn.Module):
             return None
         decoder_output = scale_grad(decoder_output, self.loss_weights["label"])
         return self.label_classifier(decoder_output, decoder_lens, decoder_output.size(1))
-
-    def forward_top(self, decoder_output):
-        if self.top_classifier is None:
-            return None
-        decoder_output = scale_grad(decoder_output, self.loss_weights["top"])
-        return self.top_classifier(decoder_output).squeeze(-1)
 
     def forward_property(self, decoder_output):
         if self.property_classifier is None:
@@ -239,11 +264,6 @@ class AbstractHead(nn.Module):
             return None
         return prediction[example_index, :].sigmoid().cpu()
 
-    def inference_top(self, prediction, example_index: int):
-        if prediction is None:
-            return None
-        return prediction[example_index, :].cpu()
-
     def inference_edge_presence(self, prediction, example_index: int):
         if prediction is None:
             return None
@@ -253,11 +273,6 @@ class AbstractHead(nn.Module):
         return prediction[example_index, :, :].sigmoid().masked_fill(mask, 0.0).cpu()
 
     def inference_edge_label(self, prediction, example_index: int):
-        if prediction is None:
-            return None
-        return prediction[example_index, :, :, :].argmax(dim=-1).cpu()
-
-    def inference_edge_attribute(self, prediction, example_index: int):
         if prediction is None:
             return None
         return prediction[example_index, :, :, :].argmax(dim=-1).cpu()
@@ -272,29 +287,15 @@ class AbstractHead(nn.Module):
             return {}
         return {"edge label": binary_cross_entropy(prediction["edge label"], target["edge_labels"][0].float(), mask)}
 
-    def loss_edge_attribute(self, prediction, target, mask):
-        if self.edge_classifier is None or prediction["edge attribute"] is None:
-            return {}
-
-        prediction = F.log_softmax(prediction["edge attribute"], dim=-1)
-        return {"edge attribute": cross_entropy(prediction, target["edge_attributes"], mask)}
-
     def loss_label(self, prediction, target, mask, matching):
         if self.label_classifier is None or prediction["label"] is None:
             return {}
 
         prediction = prediction["label"]
-        target, label_weight = match_smoothed_label(
-            target["relative_labels"][0], matching, self.label_smoothing, prediction.shape, prediction.device, self.query_length, self.blank_weight
+        target, label_weight = match_label(
+            target["labels"][0], matching, prediction.shape[:-1], prediction.device, self.query_length, self.blank_weight
         )
-        return {"label": multi_label_cross_entropy(prediction, target, mask, focal=self.focal, label_weight=label_weight)}
-
-    def loss_top(self, prediction, target, mask):
-        if self.top_classifier is None or prediction["top"] is None:
-            return {}
-
-        prediction = torch.log_softmax(prediction["top"].masked_fill(mask, float("-inf")), dim=-1)
-        return {"top": cross_entropy(prediction, target["top"], None)}
+        return {"label": cross_entropy(prediction, target, mask, focal=self.focal, label_weight=label_weight)}
 
     def loss_property(self, prediction, target, mask):
         if self.property_classifier is None or prediction["property"] is None:
@@ -314,19 +315,19 @@ class AbstractHead(nn.Module):
         if output["label"] is None:
             return 1.0
 
-        target_labels, _ = batch["relative_labels"]
+        indices = batch["labels"][0][b, :batch["labels"][1][b]]  # shape: (num_nodes)
+        label_prob = output["label"][b, : decoder_lens[b], :]  # shape: (num_queries, num_classes)
+        indices = indices.view(1, -1, 1).expand(label_prob.size(0), -1, -1)  # shape: (num_queries, num_nodes, 1)
+        label_prob = label_prob.unsqueeze(1).expand(-1, indices.size(1), -1)  # shape: (num_queries, num_nodes, num_classes)
+        cost_matrix = torch.gather(label_prob, 2, indices).squeeze(2).exp()  # shape: (num_queries, num_nodes)
 
-        label_prob = output["label"][b, : decoder_lens[b], :].unsqueeze(0)  # shape: (1, num_queries, num_classes)
-        tgt_label = (target_labels[b] > self.label_smoothing).long()  # shape: (num_nodes, num_inputs, num_classes)
-        tgt_label = tgt_label.repeat_interleave(self.query_length, dim=1)  # shape: (num_nodes, num_queries, num_classes)
-        cost_matrix = (tgt_label * label_prob).sum(-1).t()  # shape: (num_queries, num_nodes)
         return cost_matrix
 
     def anchor_cost_matrix(self, output, batch, decoder_lens, b: int):
         if output["anchor"] is None:
             return 1.0
 
-        num_nodes = batch["relative_labels"][0][b].size(0)
+        num_nodes = batch["labels"][1][b]
         word_lens = batch["every_input"][1]
         target_anchors, _ = batch["anchor"]
         pred_anchors = output["anchor"].sigmoid()
@@ -339,5 +340,5 @@ class AbstractHead(nn.Module):
         return cost_matrix
 
     def loss_weights_dict(self):
-        loss_weights = {f"{key} weight {self.language}-{self.framework}": weight.detach().cpu().item() for key, weight in self.loss_weights.items()}
+        loss_weights = {f"weight/{key}": weight.detach().cpu().item() for key, weight in self.loss_weights.items()}
         return loss_weights

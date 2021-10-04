@@ -15,10 +15,10 @@ import utility.parser_utils as utils
 class EvaluationParser(AbstractParser):
     def __init__(self, args, framework: str, language: str, fields):
         path = args.test_data[(framework, language)]
-        self.data = utils.load_dataset(path, framework=framework, language=language)
+        self.data = utils.load_dataset(path, framework=framework)
 
-        utils.add_companion(self.data, args.companion_data[(framework, language)], language)
-        utils.tokenize(self.data, mode="aggressive")
+        utils.add_companion(self.data, None, language, tokenization_mode="space")
+        utils.tokenize(self.data, mode="space")
 
         for sentence in self.data.values():
             sentence["token anchors"] = [[a["from"], a["to"]] for a in sentence["token anchors"]]

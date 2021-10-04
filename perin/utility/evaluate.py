@@ -51,12 +51,10 @@ def evaluate(input_dir, epoch, framework, language, gold_file):
 
     result = {
         "epoch": epoch,
-        f"evaluation tops accuracy {framework}-{language}": result["tops"]["f"],
         f"evaluation anchors f1 {framework}-{language}": result["anchors"]["f"],
         f"evaluation labels f1 {framework}-{language}": result["labels"]["f"],
         f"evaluation properties f1 {framework}-{language}": result["properties"]["f"],
         f"evaluation edges f1 {framework}-{language}": result["edges"]["f"],
-        f"evaluation attributes f1 {framework}-{language}": result["attributes"]["f"],
         f"evaluation all f1 {framework}-{language}": result["all"]["f"],
     }
 

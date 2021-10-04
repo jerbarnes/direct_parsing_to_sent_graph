@@ -2,3 +2,6 @@ frameworks:
 - ["norec", "nor"]
 
 encoder: /cluster/projects/nn9851k/models/xlm-roberta-base
+n_layers: 1
+query_length: 2
+balance_loss_weights: false

@@ -19,6 +19,7 @@ from model.head.drg_head import DRGHead
 from model.head.eds_head import EDSHead
 from model.head.ptg_head import PTGHead
 from model.head.ucca_head import UCCAHead
+from model.head.norec_head import NorecHead
 from model.module.module_wrapper import ModuleWrapper
 from utility.utils import create_padding_mask
 from data.batch import Batch
@@ -36,6 +37,7 @@ class Model(nn.Module):
             ("eds", "eng"): EDSHead,
             ("ptg", "eng"): PTGHead, ("ptg", "ces"): PTGHead,
             ("ucca", "eng"): UCCAHead, ("ucca", "deu"): UCCAHead,
+            ("norec", "nor"): NorecHead
         }
 
         self.heads = nn.ModuleList([])
@@ -56,62 +58,44 @@ class Model(nn.Module):
         decoder_lens = self.query_length * word_lens
         batch_size, input_len = every_input.size(0), every_input.size(1)
         device = every_input.device
+        framework = batch["framework"][0].cpu().item()
 
         encoder_mask = create_padding_mask(batch_size, input_len, word_lens, device)
         decoder_mask = create_padding_mask(batch_size, self.query_length * input_len, decoder_lens, device)
 
         encoder_output, decoder_input = self.encoder(
-            batch["input"], batch["char_form_input"], batch["char_lemma_input"], batch["input_scatter"], input_len, batch["framework"]
+            batch["input"], batch["char_form_input"], batch["input_scatter"], input_len, batch["framework"]
         )
 
         decoder_output = self.decoder(decoder_input, encoder_output, decoder_mask, encoder_mask)
-
-        def select_inputs(indices):
-            return (
-                encoder_output.index_select(0, indices),
-                decoder_output.index_select(0, indices),
-                encoder_mask.index_select(0, indices),
-                decoder_mask.index_select(0, indices),
-                Batch.index_select(batch, indices),
-            )
+        decoder_output.requires_grad_(True)
 
         if inference:
-            output = {}
-            for i, head in enumerate(self.heads):
-                indices = (batch["framework"] == i).nonzero(as_tuple=False).flatten()
-                if indices.size(0) == 0:
-                    continue
-                output[self.dataset.id_to_framework[i]] = head.predict(*select_inputs(indices), **kwargs)
+            return {self.dataset.id_to_framework[framework]: self.heads[framework].predict(encoder_output, decoder_output, encoder_mask, decoder_mask, batch)}
 
-            return output
+        total_loss, losses, stats = 0.0, [], {}
+        for i, head in enumerate(self.heads):
+            if i == framework:
+                total_loss_, losses_, stats_ = self.heads[framework](encoder_output, decoder_output, encoder_mask, decoder_mask, batch)
 
-        else:
-            total_loss, losses, stats = 0.0, [], {}
-            for i, head in enumerate(self.heads):
-                indices = (batch["framework"] == i).nonzero(as_tuple=False).flatten()
-
-                if indices.size(0) == 0:
-                    args = self.get_dummy_batch(head, device)
-                    total_loss_, _, _ = head(*args)
-                    total_loss = total_loss + 0.0 * total_loss_
-                    losses.append([])
-                    continue
-
-                total_loss_, losses_, stats_ = head(*select_inputs(indices))
-                lr_mult = torch.cat([batch["relative_labels"][1][j] for j in indices]).float().mean() / self.dataset.mean_label_length
-                lr_mult *= indices.size(0) / batch_size / self.args.accumulation_steps
-                total_loss = total_loss + total_loss_ * lr_mult
+                total_loss = total_loss + total_loss_ / self.args.accumulation_steps
                 losses.append(losses_)
                 stats.update(stats_)
+                continue
 
-            return total_loss, losses, stats
+            args = self.get_dummy_batch(head, device)
+            total_loss_, _, _ = head(*args)
+            total_loss = total_loss + 0.0 * total_loss_
+            losses.append([])
+
+        return total_loss, losses, stats
 
     def get_decoder_parameters(self):
-        return (p for name, p in self.named_parameters() if not name.startswith("encoder.bert") and "loss_weights" not in name)
+        return (p for name, p in self.named_parameters() if not name.startswith("encoder.bert") and "loss_weights" not in name and p.requires_grad)
 
     def get_encoder_parameters(self, n_layers):
         return [
-            [p for name, p in self.named_parameters() if name.startswith(f"encoder.bert.encoder.layer.{n_layers - 1 - i}.")] for i in range(n_layers)
+            [p for name, p in self.named_parameters() if name.startswith(f"encoder.bert.encoder.layer.{n_layers - 1 - i}.") and p.requires_grad] for i in range(n_layers)
         ]
 
     def share_weights(self):
@@ -140,10 +124,6 @@ class Model(nn.Module):
             del b.anchor_classifier
             b.anchor_classifier = ModuleWrapper(a.anchor_classifier)
 
-        if share_tops:
-            del b.top_classifier
-            b.top_classifier = ModuleWrapper(a.top_classifier)
-
         if share_labels:
             del b.label_classifier
             b.label_classifier = ModuleWrapper(a.label_classifier)
@@ -160,14 +140,10 @@ class Model(nn.Module):
         batch = {
             "every_input": (torch.zeros(1, 1, dtype=torch.long, device=device), torch.ones(1, dtype=torch.long, device=device)),
             "input": (torch.zeros(1, 1, dtype=torch.long, device=device), torch.ones(1, dtype=torch.long, device=device)),
-            "edge_permutations": ([torch.ones(1, 1, dtype=torch.long, device=device)], [torch.zeros(1, dtype=torch.bool, device=device)], [[]]),
             "labels": (torch.zeros(1, 1, dtype=torch.long, device=device), torch.ones(1, dtype=torch.long, device=device)),
-            "relative_labels": ([torch.zeros(1, 1, len(head.dataset.relative_label_field.vocab) + 1, device=device)], [torch.ones(1, dtype=torch.long, device=device)]),
             "properties": torch.zeros(1, 1, 10, dtype=torch.long, device=device),
-            "top": torch.zeros(1, dtype=torch.long, device=device),
             "edge_presence": torch.zeros(1, 1, 1, dtype=torch.long, device=device),
             "edge_labels": (torch.zeros(1, 1, 1, head.dataset.edge_label_freqs.size(0), dtype=torch.long, device=device), torch.zeros(1, 1, 1, dtype=torch.bool, device=device)),
-            "edge_attributes": torch.zeros(1, 1, 1, dtype=torch.long, device=device),
             "anchor": (torch.zeros(1, 1, 1, dtype=torch.long, device=device), torch.zeros(1, 1, dtype=torch.bool, device=device))
         }
 

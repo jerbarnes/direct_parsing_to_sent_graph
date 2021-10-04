@@ -51,7 +51,7 @@ class Tokenizer:
                     start = offset + sentence["sentence"][offset:].find(token)
                     end = start + len(token)
                     new_tokens.append(
-                        {"token": {"word": token, "lemma": None}, "span": {"from": start, "to": end}}
+                        {"token": {"word": token}, "span": {"from": start, "to": end}}
                     )
                     offset = end
 
@@ -66,7 +66,7 @@ class Tokenizer:
         new_tokens = self.create_tokens(sentence)
 
         offset, increase = 0, 0
-        new_input, new_lemmas, new_spans = [], [], []
+        new_input, new_spans = [], []
 
         for i, input in enumerate(sentence["input"]):
             derived_tokens = []
@@ -89,7 +89,6 @@ class Tokenizer:
                         derived_tokens.append(
                             {
                                 "word": input,
-                                "lemma": sentence["lemmas"][i],
                                 "span": sentence["token anchors"][i],
                             }
                         )
@@ -104,14 +103,7 @@ class Tokenizer:
 
                 word = sentence["sentence"][start:end]
 
-                if new_token["token"] is not None and new_token["token"]["lemma"] is not None:
-                    lemma = new_token["token"]["lemma"]
-                elif sentence["lemmas"][i].lower() == input.lower():
-                    lemma = word.lower()
-                else:
-                    lemma = sentence["lemmas"][i]
-
-                derived_tokens.append({"word": word, "lemma": lemma, "span": {"from": start, "to": end}})
+                derived_tokens.append({"word": word, "span": {"from": start, "to": end}})
 
                 first = False
                 if new_to <= orig_to:
@@ -121,7 +113,6 @@ class Tokenizer:
 
             for j, t in enumerate(derived_tokens):
                 new_input.append(t["word"])
-                new_lemmas.append(t["lemma"])
                 new_spans.append(t["span"])
 
                 if "nodes" not in sentence:
@@ -139,7 +130,6 @@ class Tokenizer:
             increase += len(derived_tokens) - 1
 
         sentence["input"] = new_input
-        sentence["lemmas"] = new_lemmas
         sentence["token anchors"] = new_spans
 
         if "nodes" not in sentence:
@@ -163,7 +153,6 @@ class Tokenizer:
 
         for i in to_delete[::-1]:
             del sentence["input"][i]
-            del sentence["lemmas"][i]
             del sentence["token anchors"][i]
 
             if "nodes" not in sentence:

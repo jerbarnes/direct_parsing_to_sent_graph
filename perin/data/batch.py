@@ -16,7 +16,6 @@ class Batch:
     @staticmethod
     def build(data):
         fields = list(data[0].keys())
-
         transposed = {}
         for field in fields:
             if isinstance(data[0][field], tuple):
@@ -28,9 +27,6 @@ class Batch:
 
     @staticmethod
     def _stack(field: str, examples):
-        if field in ("edge_permutations", "relative_labels"):
-            return examples
-
         dim = examples[0].dim()
 
         if dim == 0:
@@ -49,13 +45,10 @@ class Batch:
     def index_select(batch, indices):
         filtered_batch = {}
         for key, examples in batch.items():
-            if key in ("edge_permutations", "relative_labels"):
-                filtered_batch[key] = [[example[i] for i in indices] for example in examples]
+            if isinstance(examples, list) or isinstance(examples, tuple):
+                filtered_batch[key] = [example.index_select(0, indices) for example in examples]
             else:
-                if isinstance(examples, list) or isinstance(examples, tuple):
-                    filtered_batch[key] = [example.index_select(0, indices) for example in examples]
-                else:
-                    filtered_batch[key] = examples.index_select(0, indices)
+                filtered_batch[key] = examples.index_select(0, indices)
 
         return filtered_batch
 
@@ -101,4 +94,4 @@ class Batch:
             else:
                 raise Exception(f"unsupported type of {tensor} to be casted to cuda")
 
-        return tensor.cuda(device, non_blocking=True)
+        return tensor.to(device, non_blocking=True)

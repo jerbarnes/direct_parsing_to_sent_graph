@@ -94,20 +94,16 @@ class SharedDataset:
     def share_chars(self):
         sos, eos, unk, pad = "<sos>", "<eos>", "<unk>", "<pad>"
 
-        form_counter, lemma_counter = Counter(), Counter()
+        form_counter = Counter()
         for dataset in self.child_datasets.values():
             form_counter += dataset.char_form_field.vocab.freqs
-            lemma_counter += dataset.char_lemma_field.vocab.freqs
 
         form_vocab = Vocab(form_counter, min_freq=1, specials=[pad, unk, sos, eos])
-        lemma_vocab = Vocab(lemma_counter, min_freq=1, specials=[pad, unk, sos, eos])
 
         for dataset in self.child_datasets.values():
             dataset.char_form_field.vocab = dataset.char_form_field.nesting_field.vocab = form_vocab
-            dataset.char_lemma_field.vocab = dataset.char_lemma_field.nesting_field.vocab = lemma_vocab
 
         self.char_form_vocab_size = len(form_vocab)
-        self.char_lemma_vocab_size = len(lemma_vocab)
 
     def share_vocabs(self, args):
         ucca_datasets = [dataset for (f, l), dataset in self.child_datasets.items() if f == "ucca"]
@@ -141,24 +137,15 @@ class SharedDataset:
             edge_label_counter = a.edge_label_field.vocab.freqs + b.edge_label_field.vocab.freqs
             a.edge_label_field.vocab = b.edge_label_field.vocab = Vocab(edge_label_counter, specials=[])
 
-            edge_attribute_counter = a.edge_attribute_field.vocab.freqs + b.edge_attribute_field.vocab.freqs
-            a.edge_attribute_field.vocab = b.edge_attribute_field.vocab = Vocab(edge_attribute_counter, specials=[])
-
             a.create_edge_freqs(args)
             b.create_edge_freqs(args)
 
         if share_anchors:
             a.anchor_freq = b.anchor_freq = (a.train_size * a.anchor_freq + b.train_size * b.anchor_freq) / (a.train_size + b.train_size)
 
-        if share_tops:
-            a.train_size = b.train_size = a.train_size + b.train_size
-            a.create_top_freqs(args)
-            b.create_top_freqs(args)
-
         if share_labels:
-            label_counter = a.relative_label_field.vocab.freqs + b.relative_label_field.vocab.freqs
-            a.relative_label_field.vocab = b.relative_label_field.vocab = Vocab(label_counter, specials=[])
-            a.train.rule_counter = b.train.rule_counter = a.train.rule_counter + b.train.rule_counter
+            label_counter = a.label_field.vocab.freqs + b.label_field.vocab.freqs
+            a.label_field.vocab = b.label_field.vocab = Vocab(label_counter, specials=[])
             a.create_label_freqs(args)
             b.create_label_freqs(args)
 

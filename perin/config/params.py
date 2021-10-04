@@ -4,10 +4,10 @@ import copy
 
 class Params:
     def __init__(self):
-        self.accumulation_steps = 2                  # number of gradient accumulation steps for achieving a bigger batch_size
+        self.accumulation_steps = 1                  # number of gradient accumulation steps for achieving a bigger batch_size
         self.activation = "relu"                     # transformer (decoder) activation function, supported values: {'relu', 'gelu', 'sigmoid', 'mish'}
         self.balance_loss_weights = True             # use weight loss balancing (GradNorm)
-        self.batch_size = 16                         # batch size (further divided into multiple GPUs)
+        self.batch_size = 32                         # batch size (further divided into multiple GPUs)
         self.beta_2 = 0.98                           # beta 2 parameter for Adam(W) optimizer
         self.blank_weight = 1.0                      # weight of cross-entropy loss for predicting an empty label
         self.char_embedding = True                   # use character embedding in addition to bert
@@ -18,10 +18,8 @@ class Params:
         self.dropout_anchor = 0.5                    # dropout at the last layer of anchor classifier
         self.dropout_edge_label = 0.5                # dropout at the last layer of edge label classifier
         self.dropout_edge_presence = 0.5             # dropout at the last layer of edge presence classifier
-        self.dropout_edge_attribute = 0.5            # dropout at the last layer of edge presence classifier
         self.dropout_label = 0.5                     # dropout at the last layer of label classifier
         self.dropout_property = 0.7                  # dropout at the last layer of property classifier
-        self.dropout_top = 0.9                       # dropout at the last layer of top classifier
         self.dropout_transformer = 0.1               # dropout for the transformer layers (decoder)
         self.dropout_transformer_attention = 0.1     # dropout for the transformer's attention (decoder)
         self.dropout_word = 0.1                      # probability of dropping out a whole word from the encoder (in favour of char embedding)
@@ -39,7 +37,6 @@ class Params:
         self.hidden_size_anchor = 128                # hidden size anchor biaffine layer
         self.hidden_size_edge_label = 256            # hidden size for edge label biaffine layer
         self.hidden_size_edge_presence = 512         # hidden size for edge label biaffine layer
-        self.hidden_size_edge_attribute = 128        # hidden size for edge label biaffine layer
         self.label_smoothing = 0.1                   # amount of label smoothing applied for label classification
         self.layerwise_lr_decay = 1.0                # layerwise decay of learning rate in the encoder
         self.n_attention_heads = 8                   # number of attention heads in the decoding transformer
@@ -110,6 +107,14 @@ class Params:
             ("ptg", "ces"): f"{base_dir}/2020/cl/companion/combined_ces.mrp",
             ("ucca", "eng"): f"{base_dir}/2020/cf/companion/combined_udpipe.mrp",
             ("ucca", "deu"): f"{base_dir}/2020/cl/companion/combined_deu.mrp",
+
+            ("norec", "nor"): None,
+            ("opener", "eng"): None
+        }
+
+        self.raw_validation_data = {
+            ("norec", "nor"): f"{base_dir}/raw/norec/dev.json",
+            ("opener", "eng"): f"{base_dir}/raw/opener_en/dev.json"
         }
 
         return self
@@ -140,5 +145,6 @@ class Params:
         del clone.validation_data
         del clone.test_data
         del clone.companion_data
+        del clone.raw_validation_data
         del clone.frameworks
         return clone
