@@ -33,8 +33,10 @@ class Batch:
             return torch.stack(examples)
 
         lengths = [max(example.size(i) for example in examples) for i in range(dim)]
-        examples = [F.pad(example, Batch._pad_size(example, lengths)) for example in examples]
+        if any(length == 0 for length in lengths):
+            return torch.LongTensor(len(examples), *lengths)
 
+        examples = [F.pad(example, Batch._pad_size(example, lengths)) for example in examples]
         return torch.stack(examples)
 
     @staticmethod

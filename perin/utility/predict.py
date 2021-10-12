@@ -15,7 +15,7 @@ def sentence_condition(s, f, l):
     return ("framework" not in s or f == s["framework"]) and ("framework" in s or f in s["targets"])
 
 
-def predict(model, data, input_paths, raw_input_paths, args, logger, output_directory, gpu, epoch=None):
+def predict(model, data, input_paths, raw_input_paths, args, logger, output_directory, gpu, mode="validation", epoch=None):
     model.eval()
     input_files = {(f, l): input_paths[(f, l)] for f, l in args.frameworks}
 
@@ -45,7 +45,7 @@ def predict(model, data, input_paths, raw_input_paths, args, logger, output_dire
                     sentences[(framework, language)][prediction["id"]][key] = value
 
     for framework, language in args.frameworks:
-        output_path = f"{output_directory}/prediction_{epoch}_{framework}_{language}.json"
+        output_path = f"{output_directory}/prediction_{mode}_{epoch}_{framework}_{language}.json"
         with open(output_path, "w", encoding="utf8") as f:
             for sentence in sentences[(framework, language)].values():
                 json.dump(sentence, f, ensure_ascii=False)
@@ -53,7 +53,6 @@ def predict(model, data, input_paths, raw_input_paths, args, logger, output_dire
                 f.flush()
 
         score = run(["./evaluate.sh", output_path, raw_input_paths[(framework, language)]], capture_output=True, text=True)
-        print(score.stdout, flush=True)
-        print(score.stderr, flush=True)
+        print(mode, score.stdout, flush=True)
         score = float(score.stdout[len("Sentiment Tuple F1: "):-1])
-        logger.log_evaluation(score, framework, language)
+        logger.log_evaluation(score, framework, language, mode)

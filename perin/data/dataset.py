@@ -55,7 +55,7 @@ class Dataset:
         char_form_nesting = torchtext.data.Field(tokenize=char_tokenize, init_token=self.sos, eos_token=self.eos, batch_first=True)
         self.char_form_field = NestedField(char_form_nesting, include_lengths=True)
 
-        self.label_field = LabelField(preprocessing=lambda nodes: [n["label"].lower() for n in nodes])
+        self.label_field = LabelField(preprocessing=lambda nodes: [n["label"] for n in nodes])
         self.property_field = PropertyField(preprocessing=lambda nodes: [n["properties"] for n in nodes])
 
         self.id_field = Field(batch_first=True)
@@ -102,6 +102,7 @@ class Dataset:
             ("ptg", "eng"): PTGParser, ("ptg", "ces"): PTGParser,
             ("ucca", "eng"): UCCAParser, ("ucca", "deu"): UCCAParser,
             ("norec", "nor"): NorecParser, ("opener", "eng"): NorecParser,
+            ("norec", "eng"): NorecParser
         }[(framework, language)]
 
         self.train = dataset(
@@ -117,8 +118,10 @@ class Dataset:
                 "edge presence": ("edge_presence", self.edge_presence_field),
                 "edge labels": ("edge_labels", self.edge_label_field),
                 "anchor edges": ("anchor", self.anchor_field),
+                "token anchors": ("token_intervals", self.token_interval_field),
+                "id": ("id", self.id_field),
             },
-            filter_pred=lambda example: len(example.input) <= 80,
+            filter_pred=lambda example: len(example.input) <= 256,
         )
 
         self.val = dataset(
@@ -175,7 +178,7 @@ class Dataset:
         self.char_form_field.build_vocab(self.train, min_freq=1, specials=[self.pad, self.unk, self.sos, self.eos])
         self.label_field.build_vocab(self.train, min_freq=1, specials=[])
         self.property_field.build_vocab(self.train)
-        self.id_field.build_vocab(self.val, self.test, min_freq=1, specials=[])
+        self.id_field.build_vocab(self.train, self.val, self.test, min_freq=1, specials=[])
         self.edge_label_field.build_vocab(self.train)
 
         self.create_label_freqs(args)

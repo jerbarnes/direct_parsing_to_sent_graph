@@ -61,7 +61,8 @@ class Params:
             ("ucca", "deu"): f"{base_dir}/2020/cl/training/ucca.deu_train.mrp",
 
             ("norec", "nor"): f"{base_dir}/node_centric_mrp/norec/train.mrp",
-            ("opener", "eng"): f"{base_dir}/node_centric_mrp/opener_en/train.mrp"
+            ("norec_", "eng"): f"{base_dir}/node_centric_mrp/mpqa/train.mrp",
+            ("norec", "eng"): f"{base_dir}/node_centric_mrp/opener_en/train.mrp"
         }
 
         # path to the validation dataset
@@ -77,7 +78,8 @@ class Params:
             ("ucca", "deu"): f"{base_dir}/2020/cl/training/ucca.deu_val.mrp",
 
             ("norec", "nor"): f"{base_dir}/node_centric_mrp/norec/dev.mrp",
-            ("opener", "eng"): f"{base_dir}/node_centric_mrp/opener_en/dev.mrp"
+            ("norec_", "eng"): f"{base_dir}/node_centric_mrp/mpqa/dev.mrp",
+            ("norec", "eng"): f"{base_dir}/node_centric_mrp/opener_en/dev.mrp"
         }
 
         # path to the test dataset
@@ -93,7 +95,8 @@ class Params:
             ("ucca", "deu"): f"{base_dir}/2020/cl/evaluation/input.mrp",
 
             ("norec", "nor"): f"{base_dir}/node_centric_mrp/norec/test.mrp",
-            ("opener", "eng"): f"{base_dir}/node_centric_mrp/opener_en/test.mrp"
+            ("norec_", "eng"): f"{base_dir}/node_centric_mrp/mpqa/test.mrp",
+            ("norec", "eng"): f"{base_dir}/node_centric_mrp/opener_en/test.mrp"
         }
 
         # path to udpipe companion data
@@ -109,12 +112,20 @@ class Params:
             ("ucca", "deu"): f"{base_dir}/2020/cl/companion/combined_deu.mrp",
 
             ("norec", "nor"): None,
-            ("opener", "eng"): None
+            ("opener", "eng"): None,
+            ("norec", "eng"): None,
+        }
+
+        self.raw_training_data = {
+            ("norec", "nor"): f"{base_dir}/raw/norec/train.json",
+            ("norec_", "eng"): f"{base_dir}/raw/mpqa/train.json",
+            ("norec", "eng"): f"{base_dir}/raw/opener_en/train.json"
         }
 
         self.raw_validation_data = {
             ("norec", "nor"): f"{base_dir}/raw/norec/dev.json",
-            ("opener", "eng"): f"{base_dir}/raw/opener_en/dev.json"
+            ("norec_", "eng"): f"{base_dir}/raw/mpqa/dev.json",
+            ("norec", "eng"): f"{base_dir}/raw/opener_en/dev.json"
         }
 
         return self
@@ -145,6 +156,6 @@ class Params:
         del clone.validation_data
         del clone.test_data
         del clone.companion_data
-        del clone.raw_validation_data
+        del clone.raw_validation_data, clone.raw_training_data
         del clone.frameworks
         return clone

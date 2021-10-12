@@ -17,7 +17,7 @@ class NorecParser(AbstractParser):
 
         output["id"] = self.dataset.id_field.vocab.itos[prediction["id"].item()]
         output["nodes"] = self.create_nodes(prediction)
-        output["nodes"] = self.create_anchors(prediction, output["nodes"], at_least_one=True)
+        output["nodes"] = self.create_anchors(prediction, output["nodes"], join_contiguous=True, at_least_one=True)
         output["edges"] = self.create_edges(prediction, output["nodes"])
 
         return output

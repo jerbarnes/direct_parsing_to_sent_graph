@@ -175,7 +175,8 @@ def main_worker(gpu, n_gpus_per_node, master_port, directory, args):
         # VALIDATION MRP-SCORES
         #
 
-        predict(raw_model, dataset.val, args.validation_data, args.raw_validation_data, args, log, directory, gpu, epoch=epoch)
+        predict(raw_model, dataset.train, args.training_data, args.raw_training_data, args, log, directory, gpu, mode="train", epoch=epoch)
+        predict(raw_model, dataset.val, args.validation_data, args.raw_validation_data, args, log, directory, gpu, mode="validation", epoch=epoch)
 
     #
     # TEST PREDICTION

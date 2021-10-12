@@ -1,0 +1,8 @@
+frameworks:
+- ["norec", "eng"]
+
+encoder: /cluster/projects/nn9851k/models/xlm-roberta-base
+n_layers: 2
+query_length: 2
+balance_loss_weights: false
+encoder_learning_rate: 3.0e-5            # initial encoder learning rate

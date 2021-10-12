@@ -37,7 +37,7 @@ class Model(nn.Module):
             ("eds", "eng"): EDSHead,
             ("ptg", "eng"): PTGHead, ("ptg", "ces"): PTGHead,
             ("ucca", "eng"): UCCAHead, ("ucca", "deu"): UCCAHead,
-            ("norec", "nor"): NorecHead
+            ("norec", "nor"): NorecHead, ("norec", "eng"): NorecHead,
         }
 
         self.heads = nn.ModuleList([])
