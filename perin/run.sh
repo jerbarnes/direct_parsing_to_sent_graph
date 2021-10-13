@@ -23,9 +23,9 @@ module load nlpl-scipy-ecosystem/2021.01-gomkl-2019b-Python-3.7.4
 module load sentencepiece/0.1.94-gomkl-2019b-Python-3.7.4
 module load nlpl-nltk/3.5-gomkl-2019b-Python-3.7.4
 
-nvidia-smi --query-gpu=timestamp,utilization.gpu,utilization.memory \
-	--format=csv --loop=1 > "gpu_util-$SLURM_JOB_ID.csv" &
-NVIDIA_MONITOR_PID=$!  # Capture PID of monitoring process
+#nvidia-smi --query-gpu=timestamp,utilization.gpu,utilization.memory \
+#	--format=csv --loop=1 > "gpu_util-$SLURM_JOB_ID.csv" &
+#NVIDIA_MONITOR_PID=$!  # Capture PID of monitoring process
 
-TRANSFORMERS_OFFLINE=1 WANDB_MODE=offline python3 train.py --log_wandb --config config/base_norec.yaml
-kill -SIGINT "$NVIDIA_MONITOR_PID"
+TRANSFORMERS_OFFLINE=1 WANDB_MODE=offline python3 train.py --log_wandb --config config/base_mpqa.yaml
+#kill -SIGINT "$NVIDIA_MONITOR_PID"

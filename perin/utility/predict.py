@@ -1,14 +1,13 @@
 import os
 import json
 import torch
-import wandb
+import sys
 
-from PIL import Image
 from subprocess import run
-
 from data.batch import Batch
-from utility.evaluate import evaluate
-from utility.utils import resize_to_square
+
+sys.path.append("../evaluation")
+from evaluate_single_dataset import evaluate
 
 
 def sentence_condition(s, f, l):
@@ -52,7 +51,8 @@ def predict(model, data, input_paths, raw_input_paths, args, logger, output_dire
                 f.write("\n")
                 f.flush()
 
-        score = run(["./evaluate.sh", output_path, raw_input_paths[(framework, language)]], capture_output=True, text=True)
-        print(mode, score.stdout, flush=True)
-        score = float(score.stdout[len("Sentiment Tuple F1: "):-1])
-        logger.log_evaluation(score, framework, language, mode)
+        run(["./convert.sh", output_path, raw_input_paths[(framework, language)]])
+        prec, rec, f1 = evaluate(raw_input_paths[(framework, language)], f"{output_path}_converted")
+
+        print(mode, f1, flush=True)
+        logger.log_evaluation(prec, rec, f1, framework, language, mode)

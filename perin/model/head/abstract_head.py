@@ -178,10 +178,10 @@ class AbstractHead(nn.Module):
         if not config["edge presence"] and not config["edge label"]:
             return None
         if config["edge presence"]:
-            self.preference_weights["edge presence"] = dataset.edge_count / math.sqrt(2)
+            self.preference_weights["edge presence"] = 1.0  # dataset.edge_count / math.sqrt(2)
             self.loss_0["edge presence"] = torch.distributions.bernoulli.Bernoulli(dataset.edge_presence_freq).entropy()
         if config["edge label"]:
-            self.preference_weights["edge label"] = dataset.edge_count / math.sqrt(2)
+            self.preference_weights["edge label"] = 1.0  # dataset.edge_count / math.sqrt(2)
             self.loss_0["edge label"] = torch.distributions.categorical.Categorical(dataset.edge_label_freqs).entropy() / 2
 
         return EdgeClassifier(dataset, args, initialize, presence=config["edge presence"], label=config["edge label"])
@@ -190,8 +190,8 @@ class AbstractHead(nn.Module):
         if not config["label"]:
             return None
 
-        self.preference_weights["label"] = dataset.node_count / math.sqrt(2)
-        self.loss_0["label"] = torch.distributions.categorical.Categorical(dataset.label_freqs).entropy() / 2
+        self.preference_weights["label"] = 1.0  # dataset.node_count / math.sqrt(2)
+        self.loss_0["label"] = torch.distributions.categorical.Categorical(dataset.label_freqs).entropy()  # / 2
 
         classifier = nn.Sequential(
             nn.Dropout(args.dropout_label),
@@ -206,7 +206,7 @@ class AbstractHead(nn.Module):
         if not config["property"]:
             return None
 
-        self.preference_weights["property"] = dataset.property_field.vocabs["transformed"].freqs[dataset.property_field.vocabs["transformed"].stoi[1]]
+        self.preference_weights["property"] = 1.0  # dataset.property_field.vocabs["transformed"].freqs[dataset.property_field.vocabs["transformed"].stoi[1]]
 
         classifier = nn.Sequential(nn.Dropout(args.dropout_property), nn.Linear(args.hidden_size, 1))
 
@@ -221,7 +221,7 @@ class AbstractHead(nn.Module):
         if not config["anchor"]:
             return None
 
-        self.preference_weights["anchor"] = dataset.node_count / math.sqrt(2)
+        self.preference_weights["anchor"] = 1.0  # dataset.node_count / math.sqrt(2)
         self.loss_0["anchor"] = torch.distributions.bernoulli.Bernoulli(dataset.anchor_freq).entropy()
 
         return AnchorClassifier(dataset, args, initialize)

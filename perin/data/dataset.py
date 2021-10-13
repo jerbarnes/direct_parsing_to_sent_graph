@@ -208,6 +208,7 @@ class Dataset:
         ]
         label_counts = torch.FloatTensor(label_counts)
         self.label_freqs = label_counts / (self.node_count + blank_count)
+        print(f"Label frequency: {self.label_freqs}")
 
     def create_edge_freqs(self, args):
         edge_counter = [

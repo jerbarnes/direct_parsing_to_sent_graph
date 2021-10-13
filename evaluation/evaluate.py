@@ -175,9 +175,10 @@ def tuple_recall(gold, pred, keep_polarity=True, weighted=True):
 def tuple_f1(gold, pred, keep_polarity=True, weighted=True):
     prec = tuple_precision(gold, pred, keep_polarity, weighted)
     rec = tuple_recall(gold, pred, keep_polarity, weighted)
+    f1 = 2 * (prec * rec) / (prec + rec + 0.00000000000000001)
     # print("prec: {}".format(prec))
     # print("rec: {}".format(rec))
-    return 2 * (prec * rec) / (prec + rec + 0.00000000000000001)
+    return prec, rec, f1
 
 
 def main():

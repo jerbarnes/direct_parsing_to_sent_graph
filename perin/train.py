@@ -41,7 +41,7 @@ def parse_arguments():
     parser.add_argument("--dist_backend", default="nccl", type=str)
     parser.add_argument("--dist_url", default="localhost", type=str)
     parser.add_argument("--home_directory", type=str, default="/cluster/projects/nn9851k/davisamu/sent_graph_followup/data")
-    parser.add_argument("--name", default="test", type=str, help="name of this run.")
+    parser.add_argument("--name", default="opener_en", type=str, help="name of this run.")
     parser.add_argument("--save_checkpoints", dest="save_checkpoints", action="store_true", default=False)
     parser.add_argument("--log_wandb", dest="log_wandb", action="store_true", default=False)
     parser.add_argument("--wandb_log_mode", type=str, default=None, help="How to log the model weights, supported values: {'all', 'gradients', 'parameters', None}")
