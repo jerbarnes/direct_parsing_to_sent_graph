@@ -27,6 +27,9 @@ class Batch:
 
     @staticmethod
     def _stack(field: str, examples):
+        if field == "anchored_labels":
+            return examples
+
         dim = examples[0].dim()
 
         if dim == 0:

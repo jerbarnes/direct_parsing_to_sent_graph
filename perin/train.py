@@ -41,9 +41,10 @@ def parse_arguments():
     parser.add_argument("--dist_backend", default="nccl", type=str)
     parser.add_argument("--dist_url", default="localhost", type=str)
     parser.add_argument("--home_directory", type=str, default="/cluster/projects/nn9851k/davisamu/sent_graph_followup/data")
-    parser.add_argument("--name", default="opener_en", type=str, help="name of this run.")
+    parser.add_argument("--name", default="norec", type=str, help="name of this run.")
     parser.add_argument("--save_checkpoints", dest="save_checkpoints", action="store_true", default=False)
     parser.add_argument("--log_wandb", dest="log_wandb", action="store_true", default=False)
+    parser.add_argument("--validate_each", type=int, default=10, help="Validate every ${N}th epoch.")
     parser.add_argument("--wandb_log_mode", type=str, default=None, help="How to log the model weights, supported values: {'all', 'gradients', 'parameters', None}")
     parser.add_argument("--workers", type=int, default=1, help="number of CPU workers per GPU.")
     args = parser.parse_args()
@@ -146,6 +147,9 @@ def main_worker(gpu, n_gpus_per_node, master_port, directory, args):
             i += 1
 
         if not is_master:
+            continue
+
+        if epoch % args.validate_each != (args.validate_each - 1):
             continue
 
         #

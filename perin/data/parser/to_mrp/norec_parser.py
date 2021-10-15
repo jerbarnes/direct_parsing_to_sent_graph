@@ -28,3 +28,18 @@ class NorecParser(AbstractParser):
     def create_edge(self, source, target, prediction, edges, nodes):
         edge = {"source": source, "target": target, "label": None}
         edges.append(edge)
+
+    # def create_edges(self, prediction, nodes):
+    #     N = len(nodes)
+    #     edge_prediction = prediction["edge presence"][:N, :N]
+
+    #     targets = [i for i, node in enumerate(nodes) if node["label"] in ["Source", "Target"]]
+    #     sources = [i for i, node in enumerate(nodes) if node["label"] not in ["Source", "Target"]]
+
+    #     edges = []
+    #     for target in targets:
+    #         for source in sources:
+    #             if edge_prediction[source, target] >= 0.5:
+    #                 self.create_edge(source, target, prediction, edges, nodes)
+
+    #     return edges

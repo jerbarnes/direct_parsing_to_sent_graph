@@ -26,6 +26,7 @@ from data.field.edge_field import EdgeField
 from data.field.edge_label_field import EdgeLabelField
 from data.field.field import Field
 from data.field.label_field import LabelField
+from data.field.anchored_label_field import AnchoredLabelField
 from data.field.nested_field import NestedField
 from data.field.basic_field import BasicField
 from data.field.bert_field import BertField
@@ -56,6 +57,7 @@ class Dataset:
         self.char_form_field = NestedField(char_form_nesting, include_lengths=True)
 
         self.label_field = LabelField(preprocessing=lambda nodes: [n["label"] for n in nodes])
+        self.anchored_label_field = AnchoredLabelField()
         self.property_field = PropertyField(preprocessing=lambda nodes: [n["properties"] for n in nodes])
 
         self.id_field = Field(batch_first=True)
@@ -115,6 +117,7 @@ class Dataset:
                     ("labels", self.label_field),
                     ("properties", self.property_field),
                 ],
+                "anchored labels": ("anchored_labels", self.anchored_label_field),
                 "edge presence": ("edge_presence", self.edge_presence_field),
                 "edge labels": ("edge_labels", self.edge_label_field),
                 "anchor edges": ("anchor", self.anchor_field),
@@ -134,6 +137,7 @@ class Dataset:
                     ("labels", self.label_field),
                     ("properties", self.property_field),
                 ],
+                "anchored labels": ("anchored_labels", self.anchored_label_field),
                 "edge presence": ("edge_presence", self.edge_presence_field),
                 "edge labels": ("edge_labels", self.edge_label_field),
                 "anchor edges": ("anchor", self.anchor_field),
@@ -176,9 +180,10 @@ class Dataset:
 
         self.every_word_input_field.build_vocab(self.val, self.test, min_freq=1, specials=[self.pad, self.unk, self.sos, self.eos])
         self.char_form_field.build_vocab(self.train, min_freq=1, specials=[self.pad, self.unk, self.sos, self.eos])
-        self.label_field.build_vocab(self.train, min_freq=1, specials=[])
-        self.property_field.build_vocab(self.train)
         self.id_field.build_vocab(self.train, self.val, self.test, min_freq=1, specials=[])
+        self.label_field.build_vocab(self.train)
+        self.anchored_label_field.vocab = self.label_field.vocab
+        self.property_field.build_vocab(self.train)
         self.edge_label_field.build_vocab(self.train)
 
         self.create_label_freqs(args)
@@ -190,8 +195,12 @@ class Dataset:
 
         print(f"Edge frequency: {self.edge_presence_freq*100:.2f} %")
         print(f"{len(self.label_field.vocab)} words in the label vocabulary")
+        print(f"{len(self.anchored_label_field.vocab)} words in the anchored label vocabulary")
         print(f"{len(self.edge_label_field.vocab)} words in the edge label vocabulary")
         print(f"{len(self.char_form_field.vocab)} characters in the vocabulary")
+
+        print(self.label_field.vocab.freqs)
+        print(self.anchored_label_field.vocab.freqs, flush=True)
 
         Random(42).shuffle(self.train.examples)
         self.train.examples = self.train.examples[:len(self.train.examples) // n_gpus * n_gpus]

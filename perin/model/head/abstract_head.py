@@ -63,19 +63,7 @@ class AbstractHead(nn.Module):
         output["property"] = self.forward_property(decoder_output)
         output["edge presence"], output["edge label"] = self.forward_edge(decoder_output)
 
-        #try:
         return self.loss(output, batch, matching, decoder_mask)
-        # except:
-        #     print(batch)
-        #     print()
-        #     print(output)
-        #     print()
-        #     print(decoder_mask)
-        #     print()
-        #     print(matching)
-        #     print()
-        #     print(decoder_output.shape)
-        #     exit()
 
     def predict(self, encoder_output, decoder_output, encoder_mask, decoder_mask, batch, **kwargs):
         every_input, word_lens = batch["every_input"]
@@ -315,11 +303,16 @@ class AbstractHead(nn.Module):
         if output["label"] is None:
             return 1.0
 
-        indices = batch["labels"][0][b, :batch["labels"][1][b]]  # shape: (num_nodes)
-        label_prob = output["label"][b, : decoder_lens[b], :]  # shape: (num_queries, num_classes)
-        indices = indices.view(1, -1, 1).expand(label_prob.size(0), -1, -1)  # shape: (num_queries, num_nodes, 1)
-        label_prob = label_prob.unsqueeze(1).expand(-1, indices.size(1), -1)  # shape: (num_queries, num_nodes, num_classes)
-        cost_matrix = torch.gather(label_prob, 2, indices).squeeze(2).exp()  # shape: (num_queries, num_nodes)
+        target_labels = batch["anchored_labels"][b]  # shape: (num_nodes, num_inputs, num_classes)
+        label_prob = output["label"][b, : decoder_lens[b], :].exp().unsqueeze(0)  # shape: (1, num_queries, num_classes)
+        tgt_label = target_labels.repeat_interleave(self.query_length, dim=1)  # shape: (num_nodes, num_queries, num_classes)
+        cost_matrix = (tgt_label * label_prob).sum(-1).t()  # shape: (num_queries, num_nodes)
+
+        # indices = batch["labels"][0][b, :batch["labels"][1][b]]  # shape: (num_nodes)
+        # label_prob = output["label"][b, : decoder_lens[b], :]  # shape: (num_queries, num_classes)
+        # indices = indices.view(1, -1, 1).expand(label_prob.size(0), -1, -1)  # shape: (num_queries, num_nodes, 1)
+        # label_prob = label_prob.unsqueeze(1).expand(-1, indices.size(1), -1)  # shape: (num_queries, num_nodes, num_classes)
+        # cost_matrix = torch.gather(label_prob, 2, indices).squeeze(2).exp()  # shape: (num_queries, num_nodes)
 
         return cost_matrix
 

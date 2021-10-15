@@ -27,5 +27,5 @@ module load nlpl-nltk/3.5-gomkl-2019b-Python-3.7.4
 #	--format=csv --loop=1 > "gpu_util-$SLURM_JOB_ID.csv" &
 #NVIDIA_MONITOR_PID=$!  # Capture PID of monitoring process
 
-TRANSFORMERS_OFFLINE=1 WANDB_MODE=offline python3 train.py --log_wandb --config config/base_mpqa.yaml
+TRANSFORMERS_OFFLINE=1 WANDB_MODE=offline python3 train.py --log_wandb --config config/base_norec.yaml
 #kill -SIGINT "$NVIDIA_MONITOR_PID"

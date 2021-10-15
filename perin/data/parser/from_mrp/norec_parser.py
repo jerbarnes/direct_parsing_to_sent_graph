@@ -55,12 +55,21 @@ class NorecParser(AbstractParser):
 
             edge_count = utils.create_edges(sentence, normalize=False)
             self.edge_counter += edge_count
+            # self.no_edge_counter += len([n for n in sentence["nodes"] if n["label"] in ["Source", "Target"]]) * len([n for n in sentence["nodes"] if n["label"] not in ["Source", "Target"]]) - edge_count
             self.no_edge_counter += N * (N - 1) - edge_count
 
             sentence["anchor edges"] = [N, len(sentence["input"]), []]
+            sentence["anchored labels"] = [len(sentence["input"]), []]
             for i, node in enumerate(sentence["nodes"]):
+                anchored_labels = []
+                if len(node["anchors"]) == 0:
+                    print(f"Empty node in {sentence['id']}", flush=True)
+
                 for anchor in node["anchors"]:
                     sentence["anchor edges"][-1].append((i, anchor))
+                    anchored_labels.append((anchor, node["label"]))
+
+                sentence["anchored labels"][1].append(anchored_labels)
 
                 anchor_count += len(node["anchors"])
                 n_node_token_pairs += len(sentence["input"])
