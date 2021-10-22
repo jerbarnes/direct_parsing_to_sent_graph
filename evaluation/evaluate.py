@@ -9,6 +9,38 @@ from nltk.tokenize.simple import SpaceTokenizer
 
 tk = SpaceTokenizer()
 
+def get_flat(sentence, test_label="Source"):
+    mapping = {"Source": 0, "Target": 1, "Polar_expression": 2}
+    text = sentence["text"]
+    token_offsets = list(tk.span_tokenize(text))
+    flat_labels = ["O"] * len(token_offsets)
+    opinion_tuples = convert_opinion_to_tuple(sentence)
+    for tup in opinion_tuples:
+        for offset in tup[mapping[test_label]]:
+            flat_labels[offset] = test_label
+    return flat_labels
+
+def span_f1(gold, pred, test_label="Source"):
+    tp, fp, fn = 0, 0, 0
+    for gold_sent, pred_sent in zip(gold, pred):
+        gold_labels = get_flat(gold_sent, test_label)
+        pred_labels = get_flat(pred_sent, test_label)
+        for gold_label, pred_label in zip(gold_labels, pred_labels):
+            # TP
+            if gold_label == pred_label == test_label:
+                tp += 1
+            #FP
+            if gold_label != test_label and pred_label == test_label:
+                fp += 1
+            #FN
+            if gold_label == test_label and pred_label != test_label:
+                fn += 1
+    prec = tp / (tp + fp + 1e-6)
+    rec = tp / (tp + fn + 1e-6)
+    f1 = 2 * prec * rec / (prec + rec + 1e-6)
+    return prec, rec, f1
+
+
 
 def convert_char_offsets_to_token_idxs(char_offsets, token_offsets):
     """
@@ -187,6 +219,7 @@ def main():
     """
     input_dir = sys.argv[1]
     output_dir = sys.argv[2]
+    verbose = bool(sys.argv[3])
 
     # Paths correspond to what Codalab expects
     submit_dir = os.path.join(input_dir, "res/")
@@ -232,16 +265,16 @@ def main():
             # where the sent_ids are keys
             with open(gold_file) as infile:
                 gold = json.load(infile)
-            gold = dict([(s["sent_id"], convert_opinion_to_tuple(s)) for s in gold])
+            tgold = dict([(s["sent_id"], convert_opinion_to_tuple(s)) for s in gold])
 
             with open(submission_answer_file) as infile:
                 preds = json.load(infile)
-            preds = dict([(s["sent_id"], convert_opinion_to_tuple(s)) for s in preds])
+            tpreds = dict([(s["sent_id"], convert_opinion_to_tuple(s)) for s in preds])
 
             # make sure they have the same keys
             # Todo: make the error message more useful by including the missing values
-            g = sorted(gold.keys())
-            p = sorted(preds.keys())
+            g = sorted(tgold.keys())
+            p = sorted(tpreds.keys())
 
             for i in g:
                 if i not in p:
@@ -250,9 +283,27 @@ def main():
             #import pdb; pdb.set_trace()
             assert g == p, "missing some sentences"
 
-            f1 = tuple_f1(gold, preds)
+            _, _, source_f1 = span_f1(gold, preds, test_label="Source")
+            _, _, target_f1 = span_f1(gold, preds, test_label="Target")
+            _, _, expression_f1 = span_f1(gold, preds, test_label="Polar_expression")
+
+
+            _, _, unlabeled_f1 = tuple_f1(tgold, tpreds, keep_polarity=False)
+            _, _, f1 = tuple_f1(tgold, tpreds)
             results.append(f1)
-            print("SF1 on {0}: {1:.3f}".format(dataset, f1))
+
+            if verbose:
+                print("Dataset: {0}".format(dataset))
+                print("Source F1: {0:.3f}".format(source_f1))
+                print("Target F1: {0:.3f}".format(target_f1))
+                print("Expression F1: {0:.3f}".format(expression_f1))
+                print("UF1: {0:.3f}".format(unlabeled_f1))
+                print("SF1: {0:.3f}".format(f1))
+                print("-" * 40)
+                print()
+            else:
+                print("SF1 on {0}: {1:.3f}".format(dataset, f1))
+
             if subtask == "crosslingual":
                 crossdataset = "cross_" + dataset
                 output_file.write("{0}: {1:.3f}\n".format(crossdataset, f1))
