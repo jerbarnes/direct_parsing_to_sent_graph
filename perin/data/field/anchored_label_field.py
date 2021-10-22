@@ -17,13 +17,7 @@ class AnchoredLabelField(RawField):
 
     def pad(self, example, device):
         n_labels = len(self.vocab)
-
-        #print(flush=True)
-        #print(example, flush=True)
-
         n_nodes, n_tokens = len(example[1]), example[0]
-        #print(n_nodes, n_tokens, n_labels, flush=True)
-        #print(flush=True)
 
         tensor = torch.full([n_nodes, n_tokens, n_labels + 1], 0, dtype=torch.long, device=device)
         for i_node, node in enumerate(example[1]):

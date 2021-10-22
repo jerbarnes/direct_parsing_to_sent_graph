@@ -19,12 +19,13 @@ from data.concat_dataset import ConcatDataset
 
 
 class SharedDataset:
-    def __init__(self, args):
+    def __init__(self, args, verbose=True):
         self.child_datasets = {
-            (framework, language): Dataset(args) for framework, language in args.frameworks
+            (framework, language): Dataset(args, verbose=verbose) for framework, language in args.frameworks
         }
         self.framework_to_id = {(f, l): i for i, (f, l) in enumerate(args.frameworks)}
         self.id_to_framework = {i: (f, l) for i, (f, l) in enumerate(args.frameworks)}
+        self.verbose = verbose
 
     def load_state_dict(self, args, d):
         for key, dataset in self.child_datasets.items():
@@ -86,7 +87,7 @@ class SharedDataset:
         )
         self.test_size = len(self.test.dataset)
 
-        if gpu == 0:
+        if gpu == 0 and self.verbose:
             batch = next(iter(self.train))
             print(f"\nBatch content: {Batch.to_str(batch)}\n")
             print(flush=True)

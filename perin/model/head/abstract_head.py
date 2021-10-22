@@ -35,16 +35,15 @@ class AbstractHead(nn.Module):
         self.property_classifier = self.init_property_classifier(dataset, args, config, initialize)
         self.anchor_classifier = self.init_anchor_classifier(dataset, args, config, initialize)
 
-        print(self.loss_0, flush=True)
+        #print(self.loss_0, flush=True)
         s = sum(self.preference_weights.values())
         for k in self.preference_weights.keys():
             self.preference_weights[k] /= s
-        print(self.preference_weights, flush=True)
+        #print(self.preference_weights, flush=True)
 
         self.query_length = args.query_length
         self.label_smoothing = args.label_smoothing
         self.focal = args.focal
-        self.blank_weight = args.blank_weight
         self.dataset = dataset
         self.framework = framework
         self.language = language
@@ -280,10 +279,10 @@ class AbstractHead(nn.Module):
             return {}
 
         prediction = prediction["label"]
-        target, label_weight = match_label(
-            target["labels"][0], matching, prediction.shape[:-1], prediction.device, self.query_length, self.blank_weight
+        target = match_label(
+            target["labels"][0], matching, prediction.shape[:-1], prediction.device, self.query_length
         )
-        return {"label": cross_entropy(prediction, target, mask, focal=self.focal, label_weight=label_weight)}
+        return {"label": cross_entropy(prediction, target, mask, focal=self.focal, smoothing=self.label_smoothing)}
 
     def loss_property(self, prediction, target, mask):
         if self.property_classifier is None or prediction["property"] is None:

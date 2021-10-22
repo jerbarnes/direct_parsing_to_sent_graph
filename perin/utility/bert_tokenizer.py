@@ -64,7 +64,7 @@ def bert_tokenizer(example, tokenizer, encoder):
                 to_delete.append(i)
             continue
 
-        print(f"BERT parsing error in sentence {example['id']}: {example['sentence']}")
+        # print(f"BERT parsing error in sentence {example['id']}: {example['sentence']}")
 
         unk_roll = True
         to_gather.append(i + 1)

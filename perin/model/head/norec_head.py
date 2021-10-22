@@ -35,11 +35,11 @@ class NorecHead(AbstractHead):
         decoder_output = scale_grad(decoder_output, self.loss_weights["label"])
         return torch.log_softmax(self.label_classifier(decoder_output), dim=-1)
 
-    # def loss_edge_presence(self, prediction, target, mask):
-    #     #source_target_mask = (target["labels"][0] == self.source_id) | (target["labels"][0] == self.target_id)  # shape: (B, T_label)
-    #     #mask = mask | source_target_mask.unsqueeze(2)
-    #     #mask = mask | (~source_target_mask).unsqueeze(1)
-    #     return {"edge presence": binary_cross_entropy(prediction["edge presence"], target["edge_presence"].float(), mask)}
+    def loss_edge_presence(self, prediction, target, mask):
+        # source_target_mask = (target["labels"][0] == self.source_id) | (target["labels"][0] == self.target_id)  # shape: (B, T_label)
+        # mask = mask | source_target_mask.unsqueeze(2)
+        # mask = mask | (~source_target_mask).unsqueeze(1)
+        return {"edge presence": binary_cross_entropy(prediction["edge presence"], target["edge_presence"].float(), mask)}
 
     def inference_label(self, prediction):
         return prediction.argmax(dim=-1)

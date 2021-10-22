@@ -50,82 +50,55 @@ class Params:
     def init_data_paths(self, base_dir: str):
         # path to the training dataset
         self.training_data = {
-            ("amr", "eng"): f"{base_dir}/2020/cf/training/amr.mrp",
-            ("amr", "zho"): f"{base_dir}/2020/cl/training/amr.zho_train.mrp",
-            ("drg", "eng"): f"{base_dir}/2020/cf/training/drg.mrp",
-            ("drg", "deu"): f"{base_dir}/2020/cl/training/drg.deu_train.mrp",
-            ("eds", "eng"): f"{base_dir}/2020/cf/training/eds.mrp",
-            ("ptg", "eng"): f"{base_dir}/2020/cf/training/ptg.mrp",
-            ("ptg", "ces"): f"{base_dir}/2020/cl/training/ptg.ces_train.mrp",
-            ("ucca", "eng"): f"{base_dir}/2020/cf/training/ucca.mrp",
-            ("ucca", "deu"): f"{base_dir}/2020/cl/training/ucca.deu_train.mrp",
-
-            ("norec", "nor"): f"{base_dir}/node_centric_mrp/norec/train.mrp",
-            ("norec_", "eng"): f"{base_dir}/node_centric_mrp/mpqa/train.mrp",
-            ("norec", "eng"): f"{base_dir}/node_centric_mrp/opener_en/train.mrp"
+            ("darmstadt", "en"): f"{base_dir}/node_centric_mrp/darmstadt_unis/train.mrp",
+            ("mpqa", "en"): f"{base_dir}/node_centric_mrp/mpqa/train.mrp",
+            ("multibooked", "ca"): f"{base_dir}/node_centric_mrp/multibooked_ca/train.mrp",
+            ("multibooked", "eu"): f"{base_dir}/node_centric_mrp/multibooked_eu/train.mrp",
+            ("norec", "no"): f"{base_dir}/node_centric_mrp/norec/train.mrp",
+            ("opener", "en"): f"{base_dir}/node_centric_mrp/opener_en/train.mrp",
+            ("opener", "es"): f"{base_dir}/node_centric_mrp/opener_es/train.mrp",
         }
 
         # path to the validation dataset
         self.validation_data = {
-            ("amr", "eng"): f"{base_dir}/2020/cf/validation/amr.mrp",
-            ("amr", "zho"): f"{base_dir}/2020/cl/training/amr.zho_val.mrp",
-            ("drg", "eng"): f"{base_dir}/2020/cf/validation/drg.mrp",
-            ("drg", "deu"): f"{base_dir}/2020/cl/training/drg.deu_val.mrp",
-            ("eds", "eng"): f"{base_dir}/2020/cf/validation/eds.mrp",
-            ("ptg", "eng"): f"{base_dir}/2020/cf/validation/ptg.mrp",
-            ("ptg", "ces"): f"{base_dir}/2020/cl/training/ptg.ces_val.mrp",
-            ("ucca", "eng"): f"{base_dir}/2020/cf/validation/ucca.mrp",
-            ("ucca", "deu"): f"{base_dir}/2020/cl/training/ucca.deu_val.mrp",
-
-            ("norec", "nor"): f"{base_dir}/node_centric_mrp/norec/dev.mrp",
-            ("norec_", "eng"): f"{base_dir}/node_centric_mrp/mpqa/dev.mrp",
-            ("norec", "eng"): f"{base_dir}/node_centric_mrp/opener_en/dev.mrp"
+            ("darmstadt", "en"): f"{base_dir}/node_centric_mrp/darmstadt_unis/dev.mrp",
+            ("mpqa", "en"): f"{base_dir}/node_centric_mrp/mpqa/dev.mrp",
+            ("multibooked", "ca"): f"{base_dir}/node_centric_mrp/multibooked_ca/dev.mrp",
+            ("multibooked", "eu"): f"{base_dir}/node_centric_mrp/multibooked_eu/dev.mrp",
+            ("norec", "no"): f"{base_dir}/node_centric_mrp/norec/dev.mrp",
+            ("opener", "en"): f"{base_dir}/node_centric_mrp/opener_en/dev.mrp",
+            ("opener", "es"): f"{base_dir}/node_centric_mrp/opener_es/dev.mrp",
         }
 
         # path to the test dataset
         self.test_data = {
-            ("amr", "eng"): f"{base_dir}/2020/cf/evaluation/input.mrp",
-            ("amr", "zho"): f"{base_dir}/2020/cl/evaluation/input.mrp",
-            ("drg", "eng"): f"{base_dir}/2020/cf/evaluation/input.mrp",
-            ("drg", "deu"): f"{base_dir}/2020/cl/evaluation/input.mrp",
-            ("eds", "eng"): f"{base_dir}/2020/cf/evaluation/input.mrp",
-            ("ptg", "eng"): f"{base_dir}/2020/cf/evaluation/input.mrp",
-            ("ptg", "ces"): f"{base_dir}/2020/cl/evaluation/input.mrp",
-            ("ucca", "eng"): f"{base_dir}/2020/cf/evaluation/input.mrp",
-            ("ucca", "deu"): f"{base_dir}/2020/cl/evaluation/input.mrp",
-
-            ("norec", "nor"): f"{base_dir}/node_centric_mrp/norec/test.mrp",
-            ("norec_", "eng"): f"{base_dir}/node_centric_mrp/mpqa/test.mrp",
-            ("norec", "eng"): f"{base_dir}/node_centric_mrp/opener_en/test.mrp"
-        }
-
-        # path to udpipe companion data
-        self.companion_data = {
-            ("amr", "eng"): f"{base_dir}/2020/cf/companion/combined_udpipe.mrp",
-            ("amr", "zho"): f"{base_dir}/2020/cl/companion/combined_zho.mrp",
-            ("drg", "eng"): f"{base_dir}/2020/cf/companion/combined_udpipe.mrp",
-            ("drg", "deu"): f"{base_dir}/2020/cl/companion/combined_deu_translated.mrp",
-            ("eds", "eng"): f"{base_dir}/2020/cf/companion/combined_udpipe.mrp",
-            ("ptg", "eng"): f"{base_dir}/2020/cf/companion/combined_udpipe.mrp",
-            ("ptg", "ces"): f"{base_dir}/2020/cl/companion/combined_ces.mrp",
-            ("ucca", "eng"): f"{base_dir}/2020/cf/companion/combined_udpipe.mrp",
-            ("ucca", "deu"): f"{base_dir}/2020/cl/companion/combined_deu.mrp",
-
-            ("norec", "nor"): None,
-            ("opener", "eng"): None,
-            ("norec", "eng"): None,
+            ("darmstadt", "en"): f"{base_dir}/node_centric_mrp/darmstadt_unis/test.mrp",
+            ("mpqa", "en"): f"{base_dir}/node_centric_mrp/mpqa/test.mrp",
+            ("multibooked", "ca"): f"{base_dir}/node_centric_mrp/multibooked_ca/test.mrp",
+            ("multibooked", "eu"): f"{base_dir}/node_centric_mrp/multibooked_eu/test.mrp",
+            ("norec", "no"): f"{base_dir}/node_centric_mrp/norec/test.mrp",
+            ("opener", "en"): f"{base_dir}/node_centric_mrp/opener_en/test.mrp",
+            ("opener", "es"): f"{base_dir}/node_centric_mrp/opener_es/test.mrp",
         }
 
         self.raw_training_data = {
-            ("norec", "nor"): f"{base_dir}/raw/norec/train.json",
-            ("norec_", "eng"): f"{base_dir}/raw/mpqa/train.json",
-            ("norec", "eng"): f"{base_dir}/raw/opener_en/train.json"
+            ("darmstadt", "en"): f"{base_dir}/raw/darmstadt_unis/train.json",
+            ("mpqa", "en"): f"{base_dir}/raw/mpqa/train.json",
+            ("multibooked", "ca"): f"{base_dir}/raw/multibooked_ca/train.json",
+            ("multibooked", "eu"): f"{base_dir}/raw/multibooked_eu/train.json",
+            ("norec", "no"): f"{base_dir}/raw/norec/train.json",
+            ("opener", "en"): f"{base_dir}/raw/opener_en/train.json",
+            ("opener", "es"): f"{base_dir}/raw/opener_es/train.json",
         }
 
         self.raw_validation_data = {
-            ("norec", "nor"): f"{base_dir}/raw/norec/dev.json",
-            ("norec_", "eng"): f"{base_dir}/raw/mpqa/dev.json",
-            ("norec", "eng"): f"{base_dir}/raw/opener_en/dev.json"
+            ("darmstadt", "en"): f"{base_dir}/raw/darmstadt_unis/dev.json",
+            ("mpqa", "en"): f"{base_dir}/raw/mpqa/dev.json",
+            ("multibooked", "ca"): f"{base_dir}/raw/multibooked_ca/dev.json",
+            ("multibooked", "eu"): f"{base_dir}/raw/multibooked_eu/dev.json",
+            ("norec", "no"): f"{base_dir}/raw/norec/dev.json",
+            ("opener", "en"): f"{base_dir}/raw/opener_en/dev.json",
+            ("opener", "es"): f"{base_dir}/raw/opener_es/dev.json",
         }
 
         return self
@@ -155,7 +128,6 @@ class Params:
         del clone.training_data
         del clone.validation_data
         del clone.test_data
-        del clone.companion_data
         del clone.raw_validation_data, clone.raw_training_data
         del clone.frameworks
         return clone

@@ -10,10 +10,6 @@ sys.path.append("../evaluation")
 from evaluate_single_dataset import evaluate
 
 
-def sentence_condition(s, f, l):
-    return ("framework" not in s or f == s["framework"]) and ("framework" in s or f in s["targets"])
-
-
 def predict(model, data, input_paths, raw_input_paths, args, logger, output_directory, gpu, mode="validation", epoch=None):
     model.eval()
     input_files = {(f, l): input_paths[(f, l)] for f, l in args.frameworks}
@@ -23,9 +19,6 @@ def predict(model, data, input_paths, raw_input_paths, args, logger, output_dire
         with open(input_files[(framework, language)], encoding="utf8") as f:
             for line in f.readlines():
                 line = json.loads(line)
-
-                if not sentence_condition(line, framework, language):
-                    continue
 
                 line["nodes"] = []
                 line["edges"] = []
@@ -54,5 +47,8 @@ def predict(model, data, input_paths, raw_input_paths, args, logger, output_dire
         run(["./convert.sh", output_path, raw_input_paths[(framework, language)]])
         prec, rec, f1 = evaluate(raw_input_paths[(framework, language)], f"{output_path}_converted")
 
-        print(mode, f1, flush=True)
-        logger.log_evaluation(prec, rec, f1, framework, language, mode)
+        if logger is not None:
+            print(mode, f1, flush=True)
+            logger.log_evaluation(prec, rec, f1, framework, language, mode)
+
+    return f1

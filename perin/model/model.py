@@ -14,11 +14,6 @@ import torch.nn as nn
 from model.module.encoder import Encoder
 
 from model.module.transformer import Decoder
-from model.head.amr_head import AMRHead
-from model.head.drg_head import DRGHead
-from model.head.eds_head import EDSHead
-from model.head.ptg_head import PTGHead
-from model.head.ucca_head import UCCAHead
 from model.head.norec_head import NorecHead
 from model.module.module_wrapper import ModuleWrapper
 from utility.utils import create_padding_mask
@@ -31,19 +26,10 @@ class Model(nn.Module):
         self.encoder = Encoder(args, dataset)
         self.decoder = Decoder(args)
 
-        head_dict = {
-            ("amr", "eng"): AMRHead, ("amr", "zho"): EDSHead,
-            ("drg", "eng"): DRGHead, ("drg", "deu"): DRGHead,
-            ("eds", "eng"): EDSHead,
-            ("ptg", "eng"): PTGHead, ("ptg", "ces"): PTGHead,
-            ("ucca", "eng"): UCCAHead, ("ucca", "deu"): UCCAHead,
-            ("norec", "nor"): NorecHead, ("norec", "eng"): NorecHead,
-        }
-
         self.heads = nn.ModuleList([])
         for i in range(len(dataset.child_datasets)):
             f, l = dataset.id_to_framework[i]
-            self.heads.append(head_dict[(f, l)](dataset.child_datasets[(f, l)], args, f, l, initialize))
+            self.heads.append(NorecHead(dataset.child_datasets[(f, l)], args, f, l, initialize))
 
         self.query_length = args.query_length
         self.label_smoothing = args.label_smoothing
@@ -90,13 +76,31 @@ class Model(nn.Module):
 
         return total_loss, losses, stats
 
-    def get_decoder_parameters(self):
-        return (p for name, p in self.named_parameters() if not name.startswith("encoder.bert") and "loss_weights" not in name and p.requires_grad)
+    def get_params_for_optimizer(self, args):
+        encoder_decay, encoder_no_decay = self.get_encoder_parameters()
+        decoder_decay, decoder_no_decay = self.get_decoder_parameters()
 
-    def get_encoder_parameters(self, n_layers):
-        return [
-            [p for name, p in self.named_parameters() if name.startswith(f"encoder.bert.encoder.layer.{n_layers - 1 - i}.") and p.requires_grad] for i in range(n_layers)
+        parameters = [
+            {"params": encoder_decay, "weight_decay": args.encoder_weight_decay},
+            {"params": encoder_no_decay, "weight_decay": 0.0},
+            {"params": decoder_decay, "weight_decay": args.decoder_weight_decay},
+            {"params": decoder_no_decay, "weight_decay": 0.0},
         ]
+        return parameters
+
+    def get_decoder_parameters(self):
+        no_decay = ["bias", "LayerNorm.weight", "_norm.weight"]
+        decay_params = (p for name, p in self.named_parameters() if not any(nd in name for nd in no_decay) and not name.startswith("encoder.bert") and "loss_weights" not in name and p.requires_grad)
+        no_decay_params = (p for name, p in self.named_parameters() if any(nd in name for nd in no_decay) and not name.startswith("encoder.bert") and "loss_weights" not in name and p.requires_grad)
+
+        return decay_params, no_decay_params
+
+    def get_encoder_parameters(self):
+        no_decay = ["bias", "LayerNorm.weight", "_norm.weight"]
+        decay_params = (p for name, p in self.named_parameters() if not any(nd in name for nd in no_decay) and name.startswith(f"encoder.bert.encoder") and p.requires_grad)
+        no_decay_params = (p for name, p in self.named_parameters() if any(nd in name for nd in no_decay) and name.startswith(f"encoder.bert.encoder") and p.requires_grad)
+
+        return decay_params, no_decay_params
 
     def share_weights(self):
         ucca_heads = [head for i, head in enumerate(self.heads) if self.dataset.id_to_framework[i][0] == "ucca"]

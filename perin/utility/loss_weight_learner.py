@@ -20,9 +20,9 @@ class LossWeightLearner:
         self.accumulated_grads = 0.0
         self.distributed = args.distributed
 
-        print("####")
-        print(self.all_loss_keys)
-        print("####")
+        #print("####")
+        #print(self.all_loss_keys)
+        #print("####")
 
     def compute_grad(self, all_losses, epoch: int):
         for loss_weights in self.all_loss_weights:

@@ -1,6 +1,0 @@
-frameworks:
-- ["eds", "eng"]
-
-encoder: xlm-roberta-large
-accumulation_steps: 4
-batch_size: 8

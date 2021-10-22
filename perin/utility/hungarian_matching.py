@@ -13,16 +13,12 @@ from scipy.optimize import linear_sum_assignment
 
 
 @torch.no_grad()
-def match_label(target, matching, shape, device, compute_mask=True, blank_weight=None):
+def match_label(target, matching, shape, device, compute_mask=True):
     idx = _get_src_permutation_idx(matching)
 
     target_classes = torch.zeros(shape, dtype=torch.long, device=device)
     target_classes[idx] = torch.cat([t[J] for t, (_, J) in zip(target, matching)])
 
-    if blank_weight is not None:
-        weights = torch.full(target_classes.shape, fill_value=blank_weight, dtype=torch.bool, device=device)
-        weights[idx] = 1.0
-        return target_classes, weights
     return target_classes
 
 
@@ -41,15 +37,12 @@ def match_anchor(anchor, matching, shape, device):
 
 
 @torch.no_grad()
-def match_smoothed_label(target, matching, label_smoothing, shape, device, n_queries, blank_weight=None):
+def match_smoothed_label(target, matching, label_smoothing, shape, device, n_queries):
     idx = _get_src_permutation_idx(matching)
     target_classes = torch.full(shape, fill_value=label_smoothing / shape[-1], dtype=torch.float, device=device)
     target_classes[:, :, 0] = 1.0 - label_smoothing
     target_classes[idx] = torch.cat([t[J, I // n_queries, :] for t, (I, J) in zip(target, matching)])
-    if blank_weight is not None:
-        weights = torch.full(target_classes.shape[:2], fill_value=blank_weight, dtype=torch.float, device=device)
-        weights[idx] = 1.0
-        return target_classes, weights
+
     return target_classes
 
 

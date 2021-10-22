@@ -14,11 +14,6 @@ import torch
 import torchtext
 from random import Random
 
-from data.parser.from_mrp.amr_parser import AMRParser
-from data.parser.from_mrp.drg_parser import DRGParser
-from data.parser.from_mrp.eds_parser import EDSParser
-from data.parser.from_mrp.ptg_parser import PTGParser
-from data.parser.from_mrp.ucca_parser import UCCAParser
 from data.parser.from_mrp.norec_parser import NorecParser
 from data.parser.from_mrp.evaluation_parser import EvaluationParser
 from data.parser.from_mrp.request_parser import RequestParser
@@ -46,7 +41,7 @@ class Collate:
 
 
 class Dataset:
-    def __init__(self, args):
+    def __init__(self, args, verbose=True):
         self.sos, self.eos, self.pad, self.unk = "<sos>", "<eos>", "<pad>", "<unk>"
 
         self.bert_input_field = BertField()
@@ -65,6 +60,13 @@ class Dataset:
         self.edge_label_field = EdgeLabelField()
         self.anchor_field = AnchorField()
         self.token_interval_field = BasicField()
+
+        self.verbose = verbose
+
+    def log(self, text):
+        if not self.verbose:
+            return
+        print(text, flush=True)
 
     def load_state_dict(self, args, d):
         self.property_keys = d["property keys"]
@@ -97,17 +99,7 @@ class Dataset:
         return dataset
 
     def load_dataset(self, args, gpu, n_gpus, framework: str, language: str):
-        dataset = {
-            ("amr", "eng"): AMRParser, ("amr", "zho"): EDSParser,
-            ("drg", "eng"): DRGParser, ("drg", "deu"): DRGParser,
-            ("eds", "eng"): EDSParser,
-            ("ptg", "eng"): PTGParser, ("ptg", "ces"): PTGParser,
-            ("ucca", "eng"): UCCAParser, ("ucca", "deu"): UCCAParser,
-            ("norec", "nor"): NorecParser, ("opener", "eng"): NorecParser,
-            ("norec", "eng"): NorecParser
-        }[(framework, language)]
-
-        self.train = dataset(
+        self.train = NorecParser(
             args, framework, language, "training",
             fields={
                 "input": [("every_input", self.every_word_input_field), ("char_form_input", self.char_form_field)],
@@ -127,7 +119,7 @@ class Dataset:
             filter_pred=lambda example: len(example.input) <= 256,
         )
 
-        self.val = dataset(
+        self.val = NorecParser(
             args, framework, language, "validation",
             fields={
                 "input": [("every_input", self.every_word_input_field), ("char_form_input", self.char_form_field)],
@@ -167,16 +159,16 @@ class Dataset:
         self.val_size = len(self.val)
         self.test_size = len(self.test)
 
-        print(f"\n{self.train_size} sentences in the train split")
-        print(f"{self.val_size} sentences in the validation split")
-        print(f"{self.test_size} sentences in the test split")
+        self.log(f"\n{self.train_size} sentences in the train split")
+        self.log(f"{self.val_size} sentences in the validation split")
+        self.log(f"{self.test_size} sentences in the test split")
 
         self.node_count = self.train.node_counter
         self.token_count = self.train.input_count
         self.edge_count = self.train.edge_counter
         self.no_edge_count = self.train.no_edge_counter
         self.anchor_freq = self.train.anchor_freq
-        print(f"{self.node_count} nodes in the train split")
+        self.log(f"{self.node_count} nodes in the train split")
 
         self.every_word_input_field.build_vocab(self.val, self.test, min_freq=1, specials=[self.pad, self.unk, self.sos, self.eos])
         self.char_form_field.build_vocab(self.train, min_freq=1, specials=[self.pad, self.unk, self.sos, self.eos])
@@ -191,16 +183,16 @@ class Dataset:
         self.create_property_freqs(args)
 
         self.property_keys = self.property_field.keys
-        print("properties: ", self.property_field.keys)
+        self.log(f"properties: {self.property_field.keys}")
 
-        print(f"Edge frequency: {self.edge_presence_freq*100:.2f} %")
-        print(f"{len(self.label_field.vocab)} words in the label vocabulary")
-        print(f"{len(self.anchored_label_field.vocab)} words in the anchored label vocabulary")
-        print(f"{len(self.edge_label_field.vocab)} words in the edge label vocabulary")
-        print(f"{len(self.char_form_field.vocab)} characters in the vocabulary")
+        self.log(f"Edge frequency: {self.edge_presence_freq*100:.2f} %")
+        self.log(f"{len(self.label_field.vocab)} words in the label vocabulary")
+        self.log(f"{len(self.anchored_label_field.vocab)} words in the anchored label vocabulary")
+        self.log(f"{len(self.edge_label_field.vocab)} words in the edge label vocabulary")
+        self.log(f"{len(self.char_form_field.vocab)} characters in the vocabulary")
 
-        print(self.label_field.vocab.freqs)
-        print(self.anchored_label_field.vocab.freqs, flush=True)
+        self.log(self.label_field.vocab.freqs)
+        self.log(self.anchored_label_field.vocab.freqs)
 
         Random(42).shuffle(self.train.examples)
         self.train.examples = self.train.examples[:len(self.train.examples) // n_gpus * n_gpus]
@@ -208,7 +200,7 @@ class Dataset:
 
     def create_label_freqs(self, args):
         n_rules = len(self.label_field.vocab)
-        blank_count = (args.query_length * self.token_count - self.node_count) * args.blank_weight
+        blank_count = (args.query_length * self.token_count - self.node_count)
         blank_p = blank_count * (1.0 - args.label_smoothing) + self.node_count * args.label_smoothing / n_rules
         non_blank_p = blank_count * args.label_smoothing / n_rules
         label_counts = [blank_p] + [
@@ -217,7 +209,7 @@ class Dataset:
         ]
         label_counts = torch.FloatTensor(label_counts)
         self.label_freqs = label_counts / (self.node_count + blank_count)
-        print(f"Label frequency: {self.label_freqs}")
+        self.log(f"Label frequency: {self.label_freqs}")
 
     def create_edge_freqs(self, args):
         edge_counter = [

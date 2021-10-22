@@ -24,7 +24,6 @@ class LabelField(RawField):
                 counter.update(x)
 
         self.vocab = Vocab(counter, specials=[])
-        print(self.vocab.freqs)
 
     def process(self, example, device=None):
         tensor, lengths = self.numericalize(example, device=device)
