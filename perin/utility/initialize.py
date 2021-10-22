@@ -14,7 +14,7 @@ def initialize(args, init_wandb: bool):
     if init_wandb:
         import wandb
         tags = {x for f in args.frameworks for x in f}
-        wandb.init(name=args.name, dir="../../wandb", mode="offline", config=args.get_hyperparameters(), project="sentiment_graphs", tags=list(tags))
+        wandb.init(name=f"{args.frameworks[0]}_{args.name}", dir="../../wandb", mode="offline", config=args.get_hyperparameters(), project="sentiment_graphs", tags=list(tags))
         # args.get_hyperparameters().save("config.json")
         # wandb.save("config.json")
         print("Connection to Weights & Biases initialized.", flush=True)

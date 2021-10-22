@@ -17,7 +17,7 @@ class EvaluationParser(AbstractParser):
         path = args.test_data[(framework, language)]
         self.data = utils.load_dataset(path, framework=framework)
 
-        utils.add_companion(self.data, None, language, tokenization_mode="space")
+        utils.add_fake_companion(self.data, language, tokenization_mode="space")
         utils.tokenize(self.data, mode="space")
 
         for sentence in self.data.values():

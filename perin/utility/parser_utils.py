@@ -26,116 +26,30 @@ os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
 
 def load_dataset(path, framework, language=None):
-    def condition(s, f, l):
-        return ("framework" not in s or f == s["framework"]) and ("framework" in s or f in s["targets"]) and (l is None or s["language"] == l)
-
     data = {}
     with open(path, encoding="utf8") as f:
         for sentence in f.readlines():
             sentence = json.loads(sentence)
-            if condition(sentence, framework, language):
-                data[sentence["id"]] = sentence
+            data[sentence["id"]] = sentence
 
-                if framework == "amr":
-                    sentence["input"] = sentence["input"].replace('  ', ' ')
-                    sentence["input"] = bytes(sentence["input"], 'utf-8').decode('utf-8', 'ignore')
+            if framework == "amr":
+                sentence["input"] = sentence["input"].replace('  ', ' ')
+                sentence["input"] = bytes(sentence["input"], 'utf-8').decode('utf-8', 'ignore')
 
-                if "nodes" not in sentence:
-                    sentence["nodes"] = []
+            if "nodes" not in sentence:
+                sentence["nodes"] = []
 
-                for node in sentence["nodes"]:
-                    if "properties" in node:
-                        node["properties"] = {prop: node["values"][prop_i] for prop_i, prop in enumerate(node["properties"])}
-                        del node["values"]
-                    else:
-                        node["properties"] = {}
+            for node in sentence["nodes"]:
+                if "properties" in node:
+                    node["properties"] = {prop: node["values"][prop_i] for prop_i, prop in enumerate(node["properties"])}
+                    del node["values"]
+                else:
+                    node["properties"] = {}
 
-                if "edges" not in sentence:
-                    sentence["edges"] = []
+            if "edges" not in sentence:
+                sentence["edges"] = []
 
     return data
-
-
-def add_companion(data, path, language: str, tokenization_mode="aggresive"):
-    if path is None:
-        add_fake_companion(data, language, tokenization_mode=tokenization_mode)
-        return
-
-    companion = {}
-    with open(path, encoding="utf8") as f:
-        for line in f.readlines():
-            example = json.loads(line)
-            companion[example["id"]] = example
-
-    for sentence in list(data.values()):
-        if sentence["id"] not in companion:
-            del data[sentence["id"]]
-            print(f"WARNING: sentence {sentence['id']} not found in companion, it's omitted from the dataset")
-
-    error_count = 0
-    for l in companion.values():
-        if l["id"] in data:
-            if l["input"].replace(' ', '') != data[l["id"]]["input"].replace(' ', ''):
-                print(f"WARNING: sentence {l['id']} not matching companion")
-                print(f"original: {data[l['id']]['input']}")
-                print(f"companion: {l['input']}")
-                print(flush=True)
-                del data[l["id"]]
-                error_count += 1
-                continue
-
-            if language == "zho":
-                offset = 0
-                for n in l["nodes"]:
-                    index = l["input"][offset:].find(n["label"])
-                    start = offset + index
-                    end = start + len(n["label"])
-
-                    n["anchors"] = [{"from": start, "to": end}]
-                    offset = end
-
-            last_start, last_end = None, None
-            for i, node in reversed(list(enumerate(l["nodes"]))):
-                assert len(node["anchors"]) == 1
-                start, end = node["anchors"][0]["from"], node["anchors"][0]["to"]
-
-                if last_start is not None and end - 1 > last_start:
-                    node["anchors"][0]["to"] = last_end
-                    l["nodes"].pop(i + 1)
-
-                last_start, last_end = start, end
-
-            data[l["id"]]["sentence"] = data[l["id"]]["input"]
-
-            tokens = []
-            for n in l["nodes"]:
-                assert len(n["anchors"]) == 1
-                tokens.append(l["input"][n["anchors"][0]["from"] : n["anchors"][0]["to"]])
-
-            if ''.join(tokens).replace(' ', '') != l["input"].replace(' ', '').replace(' ', '').replace(' ', ''):
-                print(f"WARNING: sentence {l['id']} not matching companion after tokenization")
-                print(f"companion input: {l['input']}")
-                print(f"original: {data[l['id']]['input']}")
-                print(f"tokens: {tokens}")
-                print(flush=True)
-                del data[l["id"]]
-                error_count += 1
-                continue
-
-            data[l["id"]]["input"] = tokens
-
-    for sentence in list(data.values()):
-        try:
-            create_token_anchors(sentence)
-        except:
-            print(f"WARNING: sentence {sentence['id']} not matching companion after anchor computation")
-            print(f"tokens: {sentence['input']}")
-            print(f"sentence: {sentence['sentence']}")
-            print(flush=True)
-            del data[sentence["id"]]
-            error_count += 1
-
-    print(f"{error_count} erroneously matched sentences with companion")
 
 
 def add_fake_companion(data, language, tokenization_mode="aggresive"):

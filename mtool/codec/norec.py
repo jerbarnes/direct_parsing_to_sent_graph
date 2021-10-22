@@ -119,6 +119,8 @@ def write(graph, input, node_centric=False):
         for edge in graph.edges:
             if edge.tgt != node.id:
                 continue
+            if edge.src not in opinions:
+                continue
 
             opinions[edge.src][node.label][0] += anchored_text
             opinions[edge.src][node.label][1] += anchors

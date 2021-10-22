@@ -83,11 +83,13 @@ class Log:
             self.losses = None
             # self._save_model(save_as_best=False, performance=None)
 
-    def log_evaluation(self, f1_score, framework, language):
+    def log_evaluation(self, precision, recall, f1_score, framework, language, mode):
         if self.log_wandb:
-            wandb.log({"validation/sentiment_tuple_f1": f1_score})
+            wandb.log({f"{mode}/sentiment_tuple/precision": precision})
+            wandb.log({f"{mode}/sentiment_tuple/recall": recall})
+            wandb.log({f"{mode}/sentiment_tuple/f1": f1_score})
 
-        if f1_score > self.best_f1_score:
+        if mode == "validation" and f1_score > self.best_f1_score:
             if self.log_wandb:
                 wandb.run.summary["best sentiment tuple f1 score"] = f1_score
                 self.best_f1_score = f1_score

@@ -28,7 +28,7 @@ class NorecParser(AbstractParser):
 
         self.data = utils.load_dataset(path, framework=self.framework)
 
-        utils.add_companion(self.data, None, self.language, tokenization_mode="space")  # add empty companion
+        utils.add_fake_companion(self.data, self.language, tokenization_mode="space")  # add empty companion
         utils.tokenize(self.data, mode="space")
 
         utils.anchor_ids_from_intervals(self.data)
@@ -44,7 +44,7 @@ class NorecParser(AbstractParser):
             node["properties"] = {"dummy": 0}
 
             self.node_counter += 1
-        print(f"Number of unlabeled nodes: {unlabeled_count}", flush=True)
+        # print(f"Number of unlabeled nodes: {unlabeled_count}", flush=True)
 
         utils.create_bert_tokens(self.data, args.encoder)
 
@@ -55,12 +55,21 @@ class NorecParser(AbstractParser):
 
             edge_count = utils.create_edges(sentence, normalize=False)
             self.edge_counter += edge_count
+            # self.no_edge_counter += len([n for n in sentence["nodes"] if n["label"] in ["Source", "Target"]]) * len([n for n in sentence["nodes"] if n["label"] not in ["Source", "Target"]]) - edge_count
             self.no_edge_counter += N * (N - 1) - edge_count
 
             sentence["anchor edges"] = [N, len(sentence["input"]), []]
+            sentence["anchored labels"] = [len(sentence["input"]), []]
             for i, node in enumerate(sentence["nodes"]):
+                anchored_labels = []
+                #if len(node["anchors"]) == 0:
+                #    print(f"Empty node in {sentence['id']}", flush=True)
+
                 for anchor in node["anchors"]:
                     sentence["anchor edges"][-1].append((i, anchor))
+                    anchored_labels.append((anchor, node["label"]))
+
+                sentence["anchored labels"][1].append(anchored_labels)
 
                 anchor_count += len(node["anchors"])
                 n_node_token_pairs += len(sentence["input"])

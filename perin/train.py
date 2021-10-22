@@ -41,9 +41,10 @@ def parse_arguments():
     parser.add_argument("--dist_backend", default="nccl", type=str)
     parser.add_argument("--dist_url", default="localhost", type=str)
     parser.add_argument("--home_directory", type=str, default="/cluster/projects/nn9851k/davisamu/sent_graph_followup/data")
-    parser.add_argument("--name", default="test", type=str, help="name of this run.")
+    parser.add_argument("--name", default="first_evaluation", type=str, help="name of this run.")
     parser.add_argument("--save_checkpoints", dest="save_checkpoints", action="store_true", default=False)
     parser.add_argument("--log_wandb", dest="log_wandb", action="store_true", default=False)
+    parser.add_argument("--validate_each", type=int, default=10, help="Validate every ${N}th epoch.")
     parser.add_argument("--wandb_log_mode", type=str, default=None, help="How to log the model weights, supported values: {'all', 'gradients', 'parameters', None}")
     parser.add_argument("--workers", type=int, default=1, help="number of CPU workers per GPU.")
     args = parser.parse_args()
@@ -81,10 +82,7 @@ def main_worker(gpu, n_gpus_per_node, master_port, directory, args):
     dataset.load_datasets(args, gpu, n_gpus_per_node)
 
     model = Model(dataset, args)
-    parameters = [{"params": p, "weight_decay": args.encoder_weight_decay} for p in model.get_encoder_parameters(args.n_encoder_layers)] + [
-        {"params": model.get_decoder_parameters(), "weight_decay": args.decoder_weight_decay}
-    ]
-    optimizer = AdamW(parameters, betas=(0.9, args.beta_2))
+    optimizer = AdamW(model.get_params_for_optimizer(args), betas=(0.9, args.beta_2))
     scheduler = multi_scheduler_wrapper(optimizer, args)
     autoclip = AutoClip([p for name, p in model.named_parameters() if "loss_weights" not in name])
     loss_weight_learner = LossWeightLearner(args, model, n_gpus_per_node)
@@ -148,6 +146,9 @@ def main_worker(gpu, n_gpus_per_node, master_port, directory, args):
         if not is_master:
             continue
 
+        if epoch < 95 and epoch % args.validate_each != (args.validate_each - 1):
+            continue
+
         #
         # VALIDATION CROSS-ENTROPIES
         #
@@ -175,7 +176,8 @@ def main_worker(gpu, n_gpus_per_node, master_port, directory, args):
         # VALIDATION MRP-SCORES
         #
 
-        predict(raw_model, dataset.val, args.validation_data, args.raw_validation_data, args, log, directory, gpu, epoch=epoch)
+        predict(raw_model, dataset.train, args.training_data, args.raw_training_data, args, log, directory, gpu, mode="train", epoch=epoch)
+        predict(raw_model, dataset.val, args.validation_data, args.raw_validation_data, args, log, directory, gpu, mode="validation", epoch=epoch)
 
     #
     # TEST PREDICTION

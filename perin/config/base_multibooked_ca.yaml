@@ -1,5 +1,5 @@
 frameworks:
-- ["opener", "en"]
+- ["multibooked", "ca"]
 
 encoder: /cluster/projects/nn9851k/models/xlm-roberta-base
 epochs: 100
