@@ -4,6 +4,7 @@ import copy
 
 class Params:
     def __init__(self):
+        self.graph_mode = "sequential"               # possibilities: {sequential, node-centric, edge-labeled}
         self.accumulation_steps = 1                  # number of gradient accumulation steps for achieving a bigger batch_size
         self.activation = "relu"                     # transformer (decoder) activation function, supported values: {'relu', 'gelu', 'sigmoid', 'mish'}
         self.balance_loss_weights = True             # use weight loss balancing (GradNorm)
@@ -20,7 +21,7 @@ class Params:
         self.dropout_edge_presence = 0.5             # dropout at the last layer of edge presence classifier
         self.dropout_label = 0.5                     # dropout at the last layer of label classifier
         self.dropout_property = 0.7                  # dropout at the last layer of property classifier
-        self.dropout_transformer = 0.1               # dropout for the transformer layers (decoder)
+        self.dropout_transformer = 0.5               # dropout for the transformer layers (decoder)
         self.dropout_transformer_attention = 0.1     # dropout for the transformer's attention (decoder)
         self.dropout_word = 0.1                      # probability of dropping out a whole word from the encoder (in favour of char embedding)
         self.encoder = "xlm-roberta-base"            # pretrained encoder model
@@ -47,59 +48,28 @@ class Params:
         self.pre_norm = True                         # use pre-normalized version of the transformer (as in Transformers without Tears)
         self.warmup_steps = 6000                     # number of the warm-up steps for the inverse_sqrt scheduler
 
-    def init_data_paths(self, base_dir: str):
-        # path to the training dataset
-        self.training_data = {
-            ("darmstadt", "en"): f"{base_dir}/node_centric_mrp/darmstadt_unis/train.mrp",
-            ("mpqa", "en"): f"{base_dir}/node_centric_mrp/mpqa/train.mrp",
-            ("multibooked", "ca"): f"{base_dir}/node_centric_mrp/multibooked_ca/train.mrp",
-            ("multibooked", "eu"): f"{base_dir}/node_centric_mrp/multibooked_eu/train.mrp",
-            ("norec", "no"): f"{base_dir}/node_centric_mrp/norec/train.mrp",
-            ("opener", "en"): f"{base_dir}/node_centric_mrp/opener_en/train.mrp",
-            ("opener", "es"): f"{base_dir}/node_centric_mrp/opener_es/train.mrp",
-        }
+    def init_data_paths(self):
+        directory_1 = {
+            "sequential": "node_centric_mrp",
+            "node-centric": "node_centric_mrp",
+            "labeled-edge": "labeled_edge_mrp"
+        }[self.graph_mode]
+        directory_2 = {
+            ("darmstadt", "en"): "darmstadt_unis",
+            ("mpqa", "en"): "mpqa",
+            ("multibooked", "ca"): "multibooked_ca",
+            ("multibooked", "eu"): "multibooked_eu",
+            ("norec", "no"): "norec",
+            ("opener", "en"): "opener_en",
+            ("opener", "es"): "opener_es",
+        }[(self.framework, self.language)]
 
-        # path to the validation dataset
-        self.validation_data = {
-            ("darmstadt", "en"): f"{base_dir}/node_centric_mrp/darmstadt_unis/dev.mrp",
-            ("mpqa", "en"): f"{base_dir}/node_centric_mrp/mpqa/dev.mrp",
-            ("multibooked", "ca"): f"{base_dir}/node_centric_mrp/multibooked_ca/dev.mrp",
-            ("multibooked", "eu"): f"{base_dir}/node_centric_mrp/multibooked_eu/dev.mrp",
-            ("norec", "no"): f"{base_dir}/node_centric_mrp/norec/dev.mrp",
-            ("opener", "en"): f"{base_dir}/node_centric_mrp/opener_en/dev.mrp",
-            ("opener", "es"): f"{base_dir}/node_centric_mrp/opener_es/dev.mrp",
-        }
+        self.training_data = f"{self.data_directory}/{directory_1}/{directory_2}/train.mrp"
+        self.validation_data = f"{self.data_directory}/{directory_1}/{directory_2}/dev.mrp"
+        self.test_data = f"{self.data_directory}/{directory_1}/{directory_2}/test.mrp"
 
-        # path to the test dataset
-        self.test_data = {
-            ("darmstadt", "en"): f"{base_dir}/node_centric_mrp/darmstadt_unis/test.mrp",
-            ("mpqa", "en"): f"{base_dir}/node_centric_mrp/mpqa/test.mrp",
-            ("multibooked", "ca"): f"{base_dir}/node_centric_mrp/multibooked_ca/test.mrp",
-            ("multibooked", "eu"): f"{base_dir}/node_centric_mrp/multibooked_eu/test.mrp",
-            ("norec", "no"): f"{base_dir}/node_centric_mrp/norec/test.mrp",
-            ("opener", "en"): f"{base_dir}/node_centric_mrp/opener_en/test.mrp",
-            ("opener", "es"): f"{base_dir}/node_centric_mrp/opener_es/test.mrp",
-        }
-
-        self.raw_training_data = {
-            ("darmstadt", "en"): f"{base_dir}/raw/darmstadt_unis/train.json",
-            ("mpqa", "en"): f"{base_dir}/raw/mpqa/train.json",
-            ("multibooked", "ca"): f"{base_dir}/raw/multibooked_ca/train.json",
-            ("multibooked", "eu"): f"{base_dir}/raw/multibooked_eu/train.json",
-            ("norec", "no"): f"{base_dir}/raw/norec/train.json",
-            ("opener", "en"): f"{base_dir}/raw/opener_en/train.json",
-            ("opener", "es"): f"{base_dir}/raw/opener_es/train.json",
-        }
-
-        self.raw_validation_data = {
-            ("darmstadt", "en"): f"{base_dir}/raw/darmstadt_unis/dev.json",
-            ("mpqa", "en"): f"{base_dir}/raw/mpqa/dev.json",
-            ("multibooked", "ca"): f"{base_dir}/raw/multibooked_ca/dev.json",
-            ("multibooked", "eu"): f"{base_dir}/raw/multibooked_eu/dev.json",
-            ("norec", "no"): f"{base_dir}/raw/norec/dev.json",
-            ("opener", "en"): f"{base_dir}/raw/opener_en/dev.json",
-            ("opener", "es"): f"{base_dir}/raw/opener_es/dev.json",
-        }
+        self.raw_training_data = f"{self.data_directory}/raw/{directory_2}/train.json"
+        self.raw_validation_data = f"{self.data_directory}/raw/{directory_2}/dev.json"
 
         return self
 
@@ -113,21 +83,12 @@ class Params:
         return {k: self.__dict__[k] for k in members}
 
     def load(self, args):
-        self.init_data_paths(args.data_directory)
         with open(args.config, "r", encoding="utf-8") as f:
             params = yaml.load(f)
             self.load_state_dict(params)
+        self.init_data_paths()
 
     def save(self, json_path):
         with open(json_path, "w", encoding="utf-8") as f:
             d = self.state_dict()
             yaml.dump(d, f)
-
-    def get_hyperparameters(self):
-        clone = copy.copy(self)
-        del clone.training_data
-        del clone.validation_data
-        del clone.test_data
-        del clone.raw_validation_data, clone.raw_training_data
-        del clone.frameworks
-        return clone

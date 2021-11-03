@@ -9,15 +9,35 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 from utility.schedule.inverse_sqrt_lr import InverseSqrtLr
+from utility.schedule.linear_lr import LinearLr
 
 
-def multi_scheduler_wrapper(optimizer, args):
-    return MultiScheduler([
-        InverseSqrtLr(optimizer.param_groups[0], args.encoder_learning_rate, args.warmup_steps, args.encoder_delay_steps),
-        InverseSqrtLr(optimizer.param_groups[1], args.encoder_learning_rate, args.warmup_steps, args.encoder_delay_steps),
-        InverseSqrtLr(optimizer.param_groups[2], args.decoder_learning_rate, args.warmup_steps, 0.0),
-        InverseSqrtLr(optimizer.param_groups[3], args.decoder_learning_rate, args.warmup_steps, 0.0),
-    ])
+def multi_scheduler_wrapper(optimizer, args, steps_per_epoch):
+    # return MultiScheduler([
+    #     InverseSqrtLr(optimizer.param_groups[0], args.encoder_learning_rate, args.warmup_steps, args.encoder_delay_steps),
+    #     InverseSqrtLr(optimizer.param_groups[1], args.encoder_learning_rate, args.warmup_steps, args.encoder_delay_steps),
+    #     InverseSqrtLr(optimizer.param_groups[2], args.decoder_learning_rate, args.warmup_steps, 0.0),
+    #     InverseSqrtLr(optimizer.param_groups[3], args.decoder_learning_rate, args.warmup_steps, 0.0),
+    # ])
+
+    n_layers = (len(optimizer.param_groups) - 2) // 2
+
+    return MultiScheduler(
+        [
+            LinearLr(optimizer.param_groups[i], args.encoder_learning_rate * (args.layerwise_lr_decay ** i), args.epochs * steps_per_epoch, 0.0)
+            for i in range(n_layers)
+        ]
+        +
+        [
+            LinearLr(optimizer.param_groups[n_layers + i], args.encoder_learning_rate * (args.layerwise_lr_decay ** i), args.epochs * steps_per_epoch, 0.0)
+            for i in range(n_layers)
+        ]
+        +
+        [
+            LinearLr(optimizer.param_groups[-2], args.decoder_learning_rate, args.epochs * steps_per_epoch, 0.0),
+            LinearLr(optimizer.param_groups[-1], args.decoder_learning_rate, args.epochs * steps_per_epoch, 0.0)
+        ]
+    )
 
 
 class MultiScheduler:

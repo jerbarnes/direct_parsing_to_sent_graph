@@ -1,5 +1,5 @@
-framework: opener
-language: es
+framework: multibooked
+language: eu
 graph_mode: node-centric
 
 encoder: /cluster/projects/nn9851k/models/xlm-roberta-base
@@ -20,7 +20,7 @@ focal: true
 hidden_size_edge_presence: 256
 hidden_size_anchor: 256
 dropout_anchor: 0.4
-dropout_edge_presence: 0.95
+dropout_edge_presence: 0.9
 dropout_label: 0.85
 batch_size: 16
 dropout_transformer: 0.25

@@ -51,22 +51,22 @@ class DecoderLayer(nn.Module):
     def __init__(self, args):
         super().__init__()
         self.self_f = Attention(args)
-        self.cross_f = Attention(args)
+        #self.cross_f = Attention(args)
         self.feedforward_f = FeedForward(args)
 
         self.pre_self_norm = nn.LayerNorm(args.hidden_size) if args.pre_norm else nn.Identity()
-        self.pre_cross_norm = nn.LayerNorm(args.hidden_size) if args.pre_norm else nn.Identity()
+        #self.pre_cross_norm = nn.LayerNorm(args.hidden_size) if args.pre_norm else nn.Identity()
         self.pre_feedforward_norm = nn.LayerNorm(args.hidden_size) if args.pre_norm else nn.Identity()
         self.post_self_norm = nn.Identity() if args.pre_norm else nn.LayerNorm(args.hidden_size)
-        self.post_cross_norm = nn.Identity() if args.pre_norm else nn.LayerNorm(args.hidden_size)
+        #self.post_cross_norm = nn.Identity() if args.pre_norm else nn.LayerNorm(args.hidden_size)
         self.post_feedforward_norm = nn.Identity() if args.pre_norm else nn.LayerNorm(args.hidden_size)
 
     def forward(self, x, encoder_output, x_mask, encoder_mask):
         x_ = self.pre_self_norm(x)
         x = self.post_self_norm(x + self.self_f(x_, x_, x_mask))
 
-        x_ = self.pre_cross_norm(x)
-        x = self.post_cross_norm(x + self.cross_f(x_, encoder_output, encoder_mask))
+        #x_ = self.pre_cross_norm(x)
+        #x = self.post_cross_norm(x + self.cross_f(x_, encoder_output, encoder_mask))
 
         x_ = self.pre_feedforward_norm(x)
         x = self.post_feedforward_norm(x + self.feedforward_f(x_))

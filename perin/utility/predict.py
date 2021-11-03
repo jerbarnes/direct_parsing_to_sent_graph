@@ -10,45 +10,41 @@ sys.path.append("../evaluation")
 from evaluate_single_dataset import evaluate
 
 
-def predict(model, data, input_paths, raw_input_paths, args, logger, output_directory, gpu, mode="validation", epoch=None):
+def predict(model, data, input_path, raw_input_path, args, logger, output_directory, device, mode="validation", epoch=None):
     model.eval()
-    input_files = {(f, l): input_paths[(f, l)] for f, l in args.frameworks}
 
-    sentences = {(f, l): {} for f, l in args.frameworks}
-    for framework, language in args.frameworks:
-        with open(input_files[(framework, language)], encoding="utf8") as f:
-            for line in f.readlines():
-                line = json.loads(line)
-
-                line["nodes"] = []
-                line["edges"] = []
-                line["tops"] = []
-                line["framework"] = framework
-                line["language"] = language
-                sentences[(framework, language)][line["id"]] = line
+    framework, language = args.framework, args.language
+    sentences = {}
+    with open(input_path, encoding="utf8") as f:
+        for line in f.readlines():
+            line = json.loads(line)
+            line["nodes"], line["edges"], line["tops"] = [], [], []
+            line["framework"], line["language"] = framework, language
+            sentences[line["id"]] = line
 
     for i, batch in enumerate(data):
         with torch.no_grad():
-            all_predictions = model(Batch.to(batch, gpu), inference=True)
-
-        for (framework, language), predictions in all_predictions.items():
+            predictions = model(Batch.to(batch, device), inference=True)
             for prediction in predictions:
                 for key, value in prediction.items():
-                    sentences[(framework, language)][prediction["id"]][key] = value
+                    sentences[prediction["id"]][key] = value
 
-    for framework, language in args.frameworks:
+    if epoch is not None:
         output_path = f"{output_directory}/prediction_{mode}_{epoch}_{framework}_{language}.json"
-        with open(output_path, "w", encoding="utf8") as f:
-            for sentence in sentences[(framework, language)].values():
-                json.dump(sentence, f, ensure_ascii=False)
-                f.write("\n")
-                f.flush()
+    else:
+        output_path = f"{output_directory}/prediction.json"
 
-        run(["./convert.sh", output_path, raw_input_paths[(framework, language)]])
-        prec, rec, f1 = evaluate(raw_input_paths[(framework, language)], f"{output_path}_converted")
+    with open(output_path, "w", encoding="utf8") as f:
+        for sentence in sentences.values():
+            json.dump(sentence, f, ensure_ascii=False)
+            f.write("\n")
+            f.flush()
+
+    run(["./convert.sh", output_path])
+
+    if raw_input_path:
+        results = evaluate(raw_input_path, f"{output_path}_converted")
+        print(mode, results, flush=True)
 
         if logger is not None:
-            print(mode, f1, flush=True)
-            logger.log_evaluation(prec, rec, f1, framework, language, mode)
-
-    return f1
+            logger.log_evaluation(results, mode, epoch)

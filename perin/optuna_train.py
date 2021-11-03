@@ -8,6 +8,8 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+import optuna
+
 import argparse
 import os
 import datetime
@@ -28,6 +30,9 @@ from utility.predict import predict
 from utility.adamw import AdamW
 from utility.loss_weight_learner import LossWeightLearner
 
+from transformers import logging
+logging.set_verbosity_error()
+
 
 def parse_arguments():
     parser = argparse.ArgumentParser()
@@ -36,9 +41,8 @@ def parse_arguments():
     parser.add_argument("--dist_backend", default="nccl", type=str)
     parser.add_argument("--dist_url", default="localhost", type=str)
     parser.add_argument("--home_directory", type=str, default="/cluster/projects/nn9851k/davisamu/sent_graph_followup/data")
-    parser.add_argument("--name", default="no-query-tanh", type=str, help="name of this run.")
+    parser.add_argument("--name", default="norec", type=str, help="name of this run.")
     parser.add_argument("--save_checkpoints", dest="save_checkpoints", action="store_true", default=False)
-    parser.add_argument("--seed", dest="seed", type=int, default=1234)
     parser.add_argument("--log_wandb", dest="log_wandb", action="store_true", default=False)
     parser.add_argument("--validate_each", type=int, default=10, help="Validate every ${N}th epoch.")
     parser.add_argument("--wandb_log_mode", type=str, default=None, help="How to log the model weights, supported values: {'all', 'gradients', 'parameters', None}")
@@ -46,8 +50,8 @@ def parse_arguments():
     args = parser.parse_args()
 
     params = Params()
-    params.load_state_dict(vars(args))
     params.load(args)
+    params.load_state_dict(vars(args))
 
     encoder_config = AutoConfig.from_pretrained(params.encoder)
     params.hidden_size = encoder_config.hidden_size
@@ -56,48 +60,45 @@ def parse_arguments():
     return params
 
 
-def main(directory, args):
-    initialize(args, init_wandb=args.log_wandb)
+def run(args):
+    initialize(args, init_wandb=False)
 
-    dataset = Dataset(args)
+    dataset = Dataset(args, verbose=False)
+    dataset.load_datasets(args)
 
     model = Model(dataset, args)
     optimizer = torch.optim.AdamW(model.get_params_for_optimizer(args), betas=(0.9, args.beta_2))
     scheduler = multi_scheduler_wrapper(optimizer, args, len(dataset.train))
-    autoclip = AutoClip([p for name, p in model.named_parameters() if "loss_weights" not in name])
+    # autoclip = AutoClip([p for name, p in model.named_parameters() if "loss_weights" not in name])
     if args.balance_loss_weights:
-        loss_weight_learner = LossWeightLearner(args, model, len(dataset.train))
+        loss_weight_learner = LossWeightLearner(args, model, 1)
 
-    print(f"\nCONFIG:\n{args.state_dict()}")
-    print(f"\n\nMODEL: {model}\n", flush=True)
-    log = Log(dataset, model, optimizer, args, directory, log_each=10, log_wandb=args.log_wandb)
-
-    device = torch.device(f"cuda:0" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
 
-    for epoch in range(args.epochs):
+    errors = []
+
+    for epoch in range(50):
 
         #
         # TRAINING
         #
 
         model.train()
-        log.train(len_dataset=dataset.train_size)
-
-        i = 0
         model.zero_grad()
 
-        for i, batch in enumerate(dataset.train):
+        i = 0
+
+        for batch in dataset.train:
             batch = Batch.to(batch, device)
             total_loss, losses, stats = model(batch)
-            stats.update(model.head.loss_weights_dict())
 
             if args.balance_loss_weights:
                 loss_weight_learner.compute_grad(losses, epoch)
             total_loss.backward()
 
             if (i + 1) % args.accumulation_steps == 0:
-                grad_norm = autoclip()
+                #_ = autoclip()
 
                 if args.balance_loss_weights:
                     loss_weight_learner.step(epoch)
@@ -105,58 +106,59 @@ def main(directory, args):
                 optimizer.step()
                 model.zero_grad()
 
-                with torch.no_grad():
-                    batch_size = batch["every_input"][0].size(0) * args.accumulation_steps
-                    log(batch_size, stats, grad_norm=0.0, learning_rates=scheduler.lr() + [loss_weight_learner.scheduler.lr() if args.balance_loss_weights else 0.0])
+            del total_loss, losses
+            i += 1
 
-        if epoch < args.epochs - 5 and epoch % args.validate_each != (args.validate_each - 1):
-            continue
+        if epoch >= 45:
+            f1 = predict(model, dataset.val, args.validation_data, args.raw_validation_data, args, None, directory, 0, mode="validation", epoch=epoch)
+            errors.append(f1)
 
-        #
-        # VALIDATION CROSS-ENTROPIES
-        #
-        model.eval()
-        log.eval(len_dataset=dataset.val_size)
+    return sum(errors) / len(errors)
 
-        # with torch.no_grad():
-        #     for batch in dataset.val:
-        #         try:
-        #             _, _, stats = model(Batch.to(batch, device))
 
-        #             batch_size = batch["every_input"][0].size(0)
-        #             log(batch_size, stats, args.frameworks)
-        #         except RuntimeError as e:
-        #             if 'out of memory' in str(e):
-        #                 print('| WARNING: ran out of memory, skipping batch')
-        #                 if hasattr(torch.cuda, 'empty_cache'):
-        #                     torch.cuda.empty_cache()
-        #             else:
-        #                 raise e
+# Define an objective function to be minimized.
+class Objective:
+    def __init__(self, args):
+        self.args = args
 
-        # log.flush()
+    def __call__(self, trial):
+        args.query_length = 2
+        args.balance_loss_weights = False
+        args.grad_norm_lr = 3.0e-4
+        args.decoder_learning_rate = trial.suggest_loguniform('decoder_learning_rate', 3.0e-5, 6.0e-4)
+        args.encoder_learning_rate = trial.suggest_loguniform('encoder_learning_rate', 3.0e-6, 3.0e-5)            # initial encoder learning rate
+        args.encoder_weight_decay = 0.1
+        args.label_smoothing = 0.0
+        args.encoder_delay_steps = 500
+        args.warmup_steps = 1000
+        args.char_embedding = True
+        args.dropout_word = 0.1
+        args.focal = True
+        args.hidden_size_edge_presence = 256
+        args.hidden_size_anchor = 256
+        self.args.dropout_anchor = trial.suggest_float('dropout_anchor', 0.25, 0.75)
+        self.args.dropout_edge_presence = trial.suggest_float('dropout_edge_presence', 0.5, 0.95)
+        self.args.dropout_label = trial.suggest_float('dropout_label', 0.5, 0.95)
+        args.batch_size = 16
+        args.beta_2 = 0.98
+        args.layerwise_lr_decay = 0.9
 
-        #
-        # VALIDATION MRP-SCORES
-        #
+        f1_score = run(self.args)
 
-        predict(model, dataset.train, args.training_data, args.raw_training_data, args, log, directory, device, mode="train", epoch=epoch)
-        predict(model, dataset.val, args.validation_data, args.raw_validation_data, args, log, directory, device, mode="validation", epoch=epoch)
+        return f1_score  # An objective value linked with the Trial object.
 
-    #
-    # TEST PREDICTION
-    #
-    test_path = f"test_predictions/{args.graph_mode}/{args.framework}_{args.language}_{args.seed}"
-    if not os.path.exists(test_path):
-        os.mkdir(test_path)
-    predict(model, dataset.test, args.test_data, None, args, None, test_path, device, mode="test")
+
+def main_worker(directory, args):
+    study = optuna.create_study(direction="maximize")  # Create a new study.
+    study.optimize(Objective(args), n_trials=100, gc_after_trial=True, show_progress_bar=True)  # Invoke optimization of the objective function.
 
 
 if __name__ == "__main__":
     args = parse_arguments()
 
     timestamp = f"{datetime.datetime.today():%m-%d-%y_%H-%M-%S}"
-    directory = f"/cluster/home/davisamu/home/sent_graph_followup/perin/outputs/test_{args.framework}_{args.language}_{timestamp}"
+    directory = f"/cluster/home/davisamu/home/sent_graph_followup/perin/outputs/test_{timestamp}"
     os.mkdir(directory)
     os.mkdir(f"{directory}/test_predictions")
 
-    main(directory, args)
+    main_worker(directory, args)

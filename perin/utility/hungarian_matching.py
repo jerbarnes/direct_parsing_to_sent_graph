@@ -36,16 +36,6 @@ def match_anchor(anchor, matching, shape, device):
     return target_classes, matched_mask
 
 
-@torch.no_grad()
-def match_smoothed_label(target, matching, label_smoothing, shape, device, n_queries):
-    idx = _get_src_permutation_idx(matching)
-    target_classes = torch.full(shape, fill_value=label_smoothing / shape[-1], dtype=torch.float, device=device)
-    target_classes[:, :, 0] = 1.0 - label_smoothing
-    target_classes[idx] = torch.cat([t[J, I // n_queries, :] for t, (I, J) in zip(target, matching)])
-
-    return target_classes
-
-
 def _get_src_permutation_idx(indices):
     # permute predictions following indices
     batch_idx = torch.cat([torch.full_like(src, i) for i, (src, _) in enumerate(indices)])

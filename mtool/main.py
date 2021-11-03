@@ -72,7 +72,7 @@ def read_graphs(stream, format = None,
   elif format == "mrp":
     generator = codec.mrp.read(stream, text = text, robust = robust);
   elif format == "norec":
-    generator = codec.norec.read(stream, text = text, reify = reify, strict = strict, node_centric = node_centric);
+    generator = codec.norec.read(stream, text = text, node_centric = node_centric);
   elif format == "pmb":
     generator = codec.pmb.read(stream, full = full,
                                reify = reify, text = text,

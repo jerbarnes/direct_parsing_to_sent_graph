@@ -15,7 +15,7 @@ from model.module.biaffine import Biaffine
 
 
 class AnchorClassifier(nn.Module):
-    def __init__(self, dataset, args, initialize: bool, bias=True):
+    def __init__(self, dataset, args, initialize: bool, bias=True, mode="anchor"):
         super(AnchorClassifier, self).__init__()
 
         self.token_f = nn.Linear(args.hidden_size, args.hidden_size_anchor)
@@ -23,7 +23,7 @@ class AnchorClassifier(nn.Module):
         self.dropout = nn.Dropout(args.dropout_anchor)
 
         if bias and initialize:
-            bias_init = torch.tensor([dataset.anchor_freq])
+            bias_init = torch.tensor([getattr(dataset, f"{mode}_freq")])
             bias_init = (bias_init / (1.0 - bias_init)).log()
         else:
             bias_init = None

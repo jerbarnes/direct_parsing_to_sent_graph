@@ -17,13 +17,13 @@ from model.module.edge_classifier import EdgeClassifier
 from model.module.anchor_classifier import AnchorClassifier
 from model.module.padding_packer import PaddingPacker
 from model.module.grad_scaler import scale_grad
-from model.module.cross_entropy import multi_label_cross_entropy, cross_entropy, binary_cross_entropy
+from utility.cross_entropy import multi_label_cross_entropy, cross_entropy, binary_cross_entropy, smooth_cross_entropy
 from utility.hungarian_matching import get_matching, reorder, match_anchor, match_label
 from utility.utils import create_padding_mask
 
 
 class AbstractHead(nn.Module):
-    def __init__(self, dataset, args, framework, language, config, initialize: bool):
+    def __init__(self, dataset, args, config, initialize: bool):
         super(AbstractHead, self).__init__()
 
         self.loss_weights = self.init_loss_weights(config)
@@ -33,27 +33,27 @@ class AbstractHead(nn.Module):
         self.edge_classifier = self.init_edge_classifier(dataset, args, config, initialize)
         self.label_classifier = self.init_label_classifier(dataset, args, config, initialize)
         self.property_classifier = self.init_property_classifier(dataset, args, config, initialize)
-        self.anchor_classifier = self.init_anchor_classifier(dataset, args, config, initialize)
+        self.anchor_classifier = self.init_anchor_classifier(dataset, args, config, initialize, mode="anchor")
+        self.source_anchor_classifier = self.init_anchor_classifier(dataset, args, config, initialize, mode="source_anchor")
+        self.target_anchor_classifier = self.init_anchor_classifier(dataset, args, config, initialize, mode="target_anchor")
 
-        #print(self.loss_0, flush=True)
         s = sum(self.preference_weights.values())
         for k in self.preference_weights.keys():
             self.preference_weights[k] /= s
-        #print(self.preference_weights, flush=True)
 
         self.query_length = args.query_length
         self.label_smoothing = args.label_smoothing
         self.focal = args.focal
         self.dataset = dataset
-        self.framework = framework
-        self.language = language
 
     def forward(self, encoder_output, decoder_output, encoder_mask, decoder_mask, batch):
         output = {}
 
         decoder_lens = self.query_length * batch["every_input"][1]
         output["label"] = self.forward_label(decoder_output, decoder_lens)
-        output["anchor"] = self.forward_anchor(decoder_output, encoder_output, encoder_mask)  # shape: (B, T_l, T_w)
+        output["anchor"] = self.forward_anchor(decoder_output, encoder_output, encoder_mask, mode="anchor")  # shape: (B, T_l, T_w)
+        output["source_anchor"] = self.forward_anchor(decoder_output, encoder_output, encoder_mask, mode="source_anchor")  # shape: (B, T_l, T_w)
+        output["target_anchor"] = self.forward_anchor(decoder_output, encoder_output, encoder_mask, mode="target_anchor")  # shape: (B, T_l, T_w)
 
         cost_matrices = self.create_cost_matrices(output, batch, decoder_lens)
         matching = get_matching(cost_matrices)
@@ -70,9 +70,13 @@ class AbstractHead(nn.Module):
         batch_size = every_input.size(0)
 
         label_pred = self.forward_label(decoder_output, decoder_lens)
-        anchor_pred = self.forward_anchor(decoder_output, encoder_output, encoder_mask)  # shape: (B, T_l, T_w)
+        anchor_pred = self.forward_anchor(decoder_output, encoder_output, encoder_mask, mode="anchor")  # shape: (B, T_l, T_w)
+        source_anchor_pred = self.forward_anchor(decoder_output, encoder_output, encoder_mask, mode="source_anchor")  # shape: (B, T_l, T_w)
+        target_anchor_pred = self.forward_anchor(decoder_output, encoder_output, encoder_mask, mode="target_anchor")  # shape: (B, T_l, T_w)
 
-        labels, anchors = [[] for _ in range(batch_size)], [[] for _ in range(batch_size)]
+        labels = [[] for _ in range(batch_size)]
+        anchors, source_anchors, target_anchors = [[] for _ in range(batch_size)], [[] for _ in range(batch_size)], [[] for _ in range(batch_size)]
+
         for b in range(batch_size):
             label_indices = self.inference_label(label_pred[b, :decoder_lens[b], :]).cpu()
             for t in range(label_indices.size(0)):
@@ -88,6 +92,16 @@ class AbstractHead(nn.Module):
                 else:
                     anchors[b].append(self.inference_anchor(anchor_pred[b, t, :word_lens[b]]).cpu())
 
+                if source_anchor_pred is None:
+                    source_anchors[b].append(list(range(t // self.query_length, word_lens[b])))
+                else:
+                    source_anchors[b].append(self.inference_anchor(source_anchor_pred[b, t, :word_lens[b]]).cpu())
+
+                if target_anchor_pred is None:
+                    target_anchors[b].append(list(range(t // self.query_length, word_lens[b])))
+                else:
+                    target_anchors[b].append(self.inference_anchor(target_anchor_pred[b, t, :word_lens[b]]).cpu())
+
         decoder_output = decoder_output[:, : max(len(l) for l in labels), :]
 
         properties = self.forward_property(decoder_output)
@@ -98,6 +112,8 @@ class AbstractHead(nn.Module):
                 {
                     "labels": labels[b],
                     "anchors": anchors[b],
+                    "source anchors": source_anchors[b],
+                    "target anchors": target_anchors[b],
                     "properties": self.inference_property(properties, b),
                     "edge presence": self.inference_edge_presence(edge_presence, b),
                     "edge labels": self.inference_edge_label(edge_labels, b),
@@ -132,7 +148,9 @@ class AbstractHead(nn.Module):
 
         losses = {}
         losses.update(self.loss_label(output, batch, decoder_mask, matching))
-        losses.update(self.loss_anchor(output, batch, input_mask, matching))
+        losses.update(self.loss_anchor(output, batch, input_mask, matching, mode="anchor"))
+        losses.update(self.loss_anchor(output, batch, input_mask, matching, mode="source_anchor"))
+        losses.update(self.loss_anchor(output, batch, input_mask, matching, mode="target_anchor"))
         losses.update(self.loss_edge_presence(output, batch, edge_mask))
         losses.update(self.loss_edge_label(output, batch, edge_label_mask.unsqueeze(-1)))
         losses.update(self.loss_property(output, batch, label_mask))
@@ -204,18 +222,18 @@ class AbstractHead(nn.Module):
 
         return classifier
 
-    def init_anchor_classifier(self, dataset, args, config, initialize: bool):
-        if not config["anchor"]:
+    def init_anchor_classifier(self, dataset, args, config, initialize: bool, mode="anchor"):
+        if not config[mode]:
             return None
 
-        self.preference_weights["anchor"] = 1.0  # dataset.node_count / math.sqrt(2)
-        self.loss_0["anchor"] = torch.distributions.bernoulli.Bernoulli(dataset.anchor_freq).entropy()
+        self.preference_weights[mode] = 1.0
+        self.loss_0[mode] = torch.distributions.bernoulli.Bernoulli(getattr(dataset, f"{mode}_freq")).entropy()
 
-        return AnchorClassifier(dataset, args, initialize)
+        return AnchorClassifier(dataset, args, initialize, mode=mode)
 
     def forward_edge(self, decoder_output):
         if self.edge_classifier is None:
-            return None
+            return None, None
         return self.edge_classifier(decoder_output, self.loss_weights)
 
     def forward_label(self, decoder_output, decoder_lens):
@@ -230,11 +248,12 @@ class AbstractHead(nn.Module):
         decoder_output = scale_grad(decoder_output, self.loss_weights["property"])
         return self.property_classifier(decoder_output).squeeze(-1)
 
-    def forward_anchor(self, decoder_output, encoder_output, encoder_mask):
-        if self.anchor_classifier is None:
+    def forward_anchor(self, decoder_output, encoder_output, encoder_mask, mode="anchor"):
+        classifier = getattr(self, f"{mode}_classifier")
+        if classifier is None:
             return None
-        decoder_output = scale_grad(decoder_output, self.loss_weights["anchor"])
-        return self.anchor_classifier(decoder_output, encoder_output, encoder_mask)
+        decoder_output = scale_grad(decoder_output, self.loss_weights[mode])
+        return classifier(decoder_output, encoder_output, encoder_mask)
 
     def inference_label(self, prediction):
         min_diff = (prediction[:, 0] - prediction[:, 1:].max(-1)[0]).min()
@@ -282,21 +301,21 @@ class AbstractHead(nn.Module):
         target = match_label(
             target["labels"][0], matching, prediction.shape[:-1], prediction.device, self.query_length
         )
-        return {"label": cross_entropy(prediction, target, mask, focal=self.focal, smoothing=self.label_smoothing)}
+        return {"label": smooth_cross_entropy(prediction, target, mask, focal=self.focal, smoothing=self.label_smoothing)}
 
     def loss_property(self, prediction, target, mask):
         if self.property_classifier is None or prediction["property"] is None:
             return {}
         return {"property": binary_cross_entropy(prediction["property"], target["properties"][:, :, 0].float(), mask)}
 
-    def loss_anchor(self, prediction, target, mask, matching):
-        if self.anchor_classifier is None or prediction["anchor"] is None:
+    def loss_anchor(self, prediction, target, mask, matching, mode="anchor"):
+        if getattr(self, f"{mode}_classifier") is None or prediction[mode] is None:
             return {}
 
-        prediction = prediction["anchor"]
-        target, anchor_mask = match_anchor(target["anchor"], matching, prediction.shape, prediction.device)
+        prediction = prediction[mode]
+        target, anchor_mask = match_anchor(target[mode], matching, prediction.shape, prediction.device)
         mask = anchor_mask.unsqueeze(-1) | mask.unsqueeze(-2)
-        return {"anchor": binary_cross_entropy(prediction, target.float(), mask)}
+        return {mode: binary_cross_entropy(prediction, target.float(), mask)}
 
     def label_cost_matrix(self, output, batch, decoder_lens, b: int):
         if output["label"] is None:
@@ -305,7 +324,7 @@ class AbstractHead(nn.Module):
         target_labels = batch["anchored_labels"][b]  # shape: (num_nodes, num_inputs, num_classes)
         label_prob = output["label"][b, : decoder_lens[b], :].exp().unsqueeze(0)  # shape: (1, num_queries, num_classes)
         tgt_label = target_labels.repeat_interleave(self.query_length, dim=1)  # shape: (num_nodes, num_queries, num_classes)
-        cost_matrix = (tgt_label * label_prob).sum(-1).t()  # shape: (num_queries, num_nodes)
+        cost_matrix = ((tgt_label * label_prob).sum(-1) * label_prob[:, :, 1:].sum(-1)).t().sqrt()  # shape: (num_queries, num_nodes)
 
         # indices = batch["labels"][0][b, :batch["labels"][1][b]]  # shape: (num_nodes)
         # label_prob = output["label"][b, : decoder_lens[b], :]  # shape: (num_queries, num_classes)

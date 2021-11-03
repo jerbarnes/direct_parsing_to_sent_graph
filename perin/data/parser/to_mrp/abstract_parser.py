@@ -9,15 +9,17 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 class AbstractParser:
-    def __init__(self, dataset, language):
+    def __init__(self, dataset):
         self.dataset = dataset
-        self.language = language
 
     def create_nodes(self, prediction):
         return [
             {"id": i, "label": self.label_to_str(l, prediction["anchors"][i], prediction)}
             for i, l in enumerate(prediction["labels"])
         ]
+
+    def label_to_str(self, label, anchors, prediction):
+        return self.dataset.label_field.vocab.itos[label - 1]
 
     def create_properties(self, prediction, nodes):
         N = len(nodes)
@@ -82,32 +84,32 @@ class AbstractParser:
 
         edges.append(edge)
 
-    def create_anchors(self, prediction, nodes, join_contiguous=True, at_least_one=False, single_anchor=False):
+    def create_anchors(self, prediction, nodes, join_contiguous=True, at_least_one=False, single_anchor=False, mode="anchors"):
         for i, node in enumerate(nodes):
-            threshold = 0.5 if not at_least_one else min(0.5, prediction["anchors"][i].max().item())
-            node["anchors"] = (prediction["anchors"][i] >= threshold).nonzero(as_tuple=False).squeeze(-1)
-            node["anchors"] = prediction["token intervals"][node["anchors"], :]
+            threshold = 0.5 if not at_least_one else min(0.5, prediction[mode][i].max().item())
+            node[mode] = (prediction[mode][i] >= threshold).nonzero(as_tuple=False).squeeze(-1)
+            node[mode] = prediction["token intervals"][node[mode], :]
 
-            if single_anchor and len(node["anchors"]) > 1:
-                start = min(a[0].item() for a in node["anchors"])
-                end = max(a[1].item() for a in node["anchors"])
-                node["anchors"] = [{"from": start, "to": end}]
+            if single_anchor and len(node[mode]) > 1:
+                start = min(a[0].item() for a in node[mode])
+                end = max(a[1].item() for a in node[mode])
+                node[mode] = [{"from": start, "to": end}]
                 continue
 
-            node["anchors"] = [{"from": f.item(), "to": t.item()} for f, t in node["anchors"]]
-            node["anchors"] = sorted(node["anchors"], key=lambda a: a["from"])
+            node[mode] = [{"from": f.item(), "to": t.item()} for f, t in node[mode]]
+            node[mode] = sorted(node[mode], key=lambda a: a["from"])
 
-            if join_contiguous and len(node["anchors"]) > 1:
+            if join_contiguous and len(node[mode]) > 1:
                 cleaned_anchors = []
-                end, start = node["anchors"][0]["from"], node["anchors"][0]["from"]
-                for anchor in node["anchors"]:
+                end, start = node[mode][0]["from"], node[mode][0]["from"]
+                for anchor in node[mode]:
                     if end < anchor["from"]:
                         cleaned_anchors.append({"from": start, "to": end})
                         start = anchor["from"]
                     end = anchor["to"]
                 cleaned_anchors.append({"from": start, "to": end})
 
-                node["anchors"] = cleaned_anchors
+                node[mode] = cleaned_anchors
 
         return nodes
 

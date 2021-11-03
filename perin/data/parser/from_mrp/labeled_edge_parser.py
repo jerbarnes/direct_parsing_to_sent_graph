@@ -18,17 +18,12 @@ from data.parser.from_mrp.abstract_parser import AbstractParser
 import utility.parser_utils as utils
 
 
-class NorecParser(AbstractParser):
-    def __init__(self, args, framework: str, language: str, part: str, fields, precomputed_dataset=None, filter_pred=None, **kwargs):
+class LabeledEdgeParser(AbstractParser):
+    def __init__(self, args, part: str, fields, filter_pred=None, **kwargs):
         assert part == "training" or part == "validation"
-        path = args.training_data[(framework, language)] if part == "training" else args.validation_data[(framework, language)]
+        path = args.training_data if part == "training" else args.validation_data
 
-        self.framework = framework
-        self.language = language
-
-        self.data = utils.load_dataset(path, framework=self.framework)
-
-        utils.add_fake_companion(self.data, self.language, tokenization_mode="space")  # add empty companion
+        self.data = utils.load_dataset(path)
         utils.tokenize(self.data, mode="space")
 
         utils.anchor_ids_from_intervals(self.data)
@@ -50,7 +45,6 @@ class NorecParser(AbstractParser):
 
         # create edge vectors
         for sentence in self.data.values():
-            sentence["language"] = language  # just to get through the later checks...
             N = len(sentence["nodes"])
 
             edge_count = utils.create_edges(sentence, normalize=False)
@@ -59,6 +53,8 @@ class NorecParser(AbstractParser):
             self.no_edge_counter += N * (N - 1) - edge_count
 
             sentence["anchor edges"] = [N, len(sentence["input"]), []]
+            sentence["source anchor edges"] = [N, len(sentence["input"]), []]  # dummy
+            sentence["target anchor edges"] = [N, len(sentence["input"]), []]  # dummy
             sentence["anchored labels"] = [len(sentence["input"]), []]
             for i, node in enumerate(sentence["nodes"]):
                 anchored_labels = []
@@ -77,9 +73,10 @@ class NorecParser(AbstractParser):
             sentence["id"] = [sentence["id"]]
 
         self.anchor_freq = anchor_count / n_node_token_pairs
+        self.source_anchor_freq = self.target_anchor_freq = 0.5  # dummy
         self.input_count = sum(len(sentence["input"]) for sentence in self.data.values())
 
-        super(NorecParser, self).__init__(fields, self.data, filter_pred)
+        super(LabeledEdgeParser, self).__init__(fields, self.data, filter_pred)
 
     @staticmethod
     def node_similarity_key(node):

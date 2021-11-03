@@ -13,11 +13,9 @@ import utility.parser_utils as utils
 
 
 class EvaluationParser(AbstractParser):
-    def __init__(self, args, framework: str, language: str, fields):
-        path = args.test_data[(framework, language)]
-        self.data = utils.load_dataset(path, framework=framework)
-
-        utils.add_fake_companion(self.data, language, tokenization_mode="space")
+    def __init__(self, args, fields):
+        path = args.test_data
+        self.data = utils.load_dataset(path)
         utils.tokenize(self.data, mode="space")
 
         for sentence in self.data.values():

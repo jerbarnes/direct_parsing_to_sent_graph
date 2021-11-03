@@ -25,16 +25,12 @@ import os
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
 
-def load_dataset(path, framework, language=None):
+def load_dataset(path):
     data = {}
     with open(path, encoding="utf8") as f:
         for sentence in f.readlines():
             sentence = json.loads(sentence)
             data[sentence["id"]] = sentence
-
-            if framework == "amr":
-                sentence["input"] = sentence["input"].replace('  ', ' ')
-                sentence["input"] = bytes(sentence["input"], 'utf-8').decode('utf-8', 'ignore')
 
             if "nodes" not in sentence:
                 sentence["nodes"] = []
@@ -49,11 +45,7 @@ def load_dataset(path, framework, language=None):
             if "edges" not in sentence:
                 sentence["edges"] = []
 
-    return data
-
-
-def add_fake_companion(data, language, tokenization_mode="aggresive"):
-    tokenizer = Tokenizer(data.values(), mode=tokenization_mode)
+    tokenizer = Tokenizer(data.values(), mode="space")
 
     for sample in list(data.values()):
         sample["sentence"] = sample["input"]
@@ -61,11 +53,10 @@ def add_fake_companion(data, language, tokenization_mode="aggresive"):
         token_objects = tokenizer.create_tokens(sample)
         token_objects = [t for t in token_objects if t["token"] is not None]
 
-        tokens = [t["token"]["word"] if isinstance(t["token"], dict) else t["token"] for t in token_objects]
-        spans = [t["span"] for t in token_objects]
+        sample["input"] = [t["token"]["word"] if isinstance(t["token"], dict) else t["token"] for t in token_objects]
+        sample["token anchors"] = [t["span"] for t in token_objects]
 
-        sample["input"] = tokens
-        sample["token anchors"] = spans
+    return data
 
 
 def create_token_anchors(sentence):

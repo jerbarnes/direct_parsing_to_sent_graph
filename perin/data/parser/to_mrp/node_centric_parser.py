@@ -11,7 +11,7 @@
 from data.parser.to_mrp.abstract_parser import AbstractParser
 
 
-class NorecParser(AbstractParser):
+class NodeCentricParser(AbstractParser):
     def parse(self, prediction):
         output = {}
 
@@ -21,9 +21,6 @@ class NorecParser(AbstractParser):
         output["edges"] = self.create_edges(prediction, output["nodes"])
 
         return output
-
-    def label_to_str(self, label, anchors, prediction):
-        return self.dataset.label_field.vocab.itos[label - 1]
 
     def create_edge(self, source, target, prediction, edges, nodes):
         edge = {"source": source, "target": target, "label": None}

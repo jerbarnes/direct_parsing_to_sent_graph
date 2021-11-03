@@ -9,6 +9,7 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.nn.utils.rnn import PackedSequence, pack_padded_sequence, pad_packed_sequence
 
 
@@ -16,12 +17,11 @@ class CharEmbedding(nn.Module):
     def __init__(self, vocab_size: int, embedding_size: int, output_size: int):
         super(CharEmbedding, self).__init__()
 
-        self.hidden_size = output_size // 2
-
         self.embedding = nn.Embedding(vocab_size, embedding_size, sparse=False)
         self.layer_norm = nn.LayerNorm(embedding_size)
-        self.gru = nn.GRU(embedding_size, self.hidden_size, num_layers=1, bidirectional=True)
-        self.layer_norm_2 = nn.LayerNorm(2 * self.hidden_size)
+        self.gru = nn.GRU(embedding_size, embedding_size, num_layers=1, bidirectional=True)
+        self.out_linear = nn.Linear(2*embedding_size, output_size)
+        self.layer_norm_2 = nn.LayerNorm(output_size)
 
     def forward(self, words, sentence_lens, word_lens):
         # input shape: (B, W, C)
@@ -38,9 +38,12 @@ class CharEmbedding(nn.Module):
         _, embedded = self.gru(embedded_packed)  # shape: (layers * 2, B*W, D)
 
         embedded = embedded[-2:, :, :].transpose(0, 1).flatten(1, 2)  # shape: (B*W, 2*D)
+        embedded = F.relu(embedded)
+        embedded = self.out_linear(embedded)
+        embedded = self.layer_norm_2(embedded)
+
         embedded, _ = pad_packed_sequence(
             PackedSequence(embedded, sentence_packed[1], sentence_packed[2], sentence_packed[3]), batch_first=True, total_length=n_words,
         )  # shape: (B, W, 2*D)
-        embedded = self.layer_norm_2(embedded)
 
         return embedded  # shape: (B, W, 2*D)
