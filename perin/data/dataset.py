@@ -14,7 +14,9 @@ import torch
 import torchtext
 from random import Random
 
-from data.parser.from_mrp.norec_parser import NorecParser
+from data.parser.from_mrp.node_centric_parser import NodeCentricParser
+from data.parser.from_mrp.labeled_edge_parser import LabeledEdgeParser
+from data.parser.from_mrp.sequential_parser import SequentialParser
 from data.parser.from_mrp.evaluation_parser import EvaluationParser
 from data.parser.from_mrp.request_parser import RequestParser
 from data.field.edge_field import EdgeField
@@ -31,7 +33,7 @@ from data.batch import Batch
 
 
 def char_tokenize(word):
-    return [c for i, c in enumerate(word) if i < 10 or len(word) - i <= 10]
+    return [c for i, c in enumerate(word)]  # if i < 10 or len(word) - i <= 10]
 
 
 class Collate:
@@ -42,6 +44,7 @@ class Collate:
 
 class Dataset:
     def __init__(self, args, verbose=True):
+        self.verbose = verbose
         self.sos, self.eos, self.pad, self.unk = "<sos>", "<eos>", "<pad>", "<unk>"
 
         self.bert_input_field = BertField()
@@ -55,13 +58,15 @@ class Dataset:
         self.anchored_label_field = AnchoredLabelField()
         self.property_field = PropertyField(preprocessing=lambda nodes: [n["properties"] for n in nodes])
 
-        self.id_field = Field(batch_first=True)
+        self.id_field = Field(batch_first=True, tokenize=lambda x: [x])
         self.edge_presence_field = EdgeField()
         self.edge_label_field = EdgeLabelField()
         self.anchor_field = AnchorField()
+        self.source_anchor_field = AnchorField()
+        self.target_anchor_field = AnchorField()
         self.token_interval_field = BasicField()
 
-        self.verbose = verbose
+        self.load_dataset(args)
 
     def log(self, text):
         if not self.verbose:
@@ -96,11 +101,17 @@ class Dataset:
         self.every_word_input_field.build_vocab(dataset, min_freq=1, specials=[self.pad, self.unk, self.sos, self.eos])
         self.id_field.build_vocab(dataset, min_freq=1, specials=[])
 
-        return dataset
+        return torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False, collate_fn=Collate())
 
-    def load_dataset(self, args, gpu, n_gpus, framework: str, language: str):
-        self.train = NorecParser(
-            args, framework, language, "training",
+    def load_dataset(self, args):
+        parser = {
+            "sequential": SequentialParser,
+            "node-centric": NodeCentricParser,
+            "labeled-edge": LabeledEdgeParser
+        }[args.graph_mode]
+
+        train = parser(
+            args, "training",
             fields={
                 "input": [("every_input", self.every_word_input_field), ("char_form_input", self.char_form_field)],
                 "bert input": ("input", self.bert_input_field),
@@ -113,14 +124,16 @@ class Dataset:
                 "edge presence": ("edge_presence", self.edge_presence_field),
                 "edge labels": ("edge_labels", self.edge_label_field),
                 "anchor edges": ("anchor", self.anchor_field),
+                "source anchor edges": ("source_anchor", self.source_anchor_field),
+                "target anchor edges": ("target_anchor", self.target_anchor_field),
                 "token anchors": ("token_intervals", self.token_interval_field),
                 "id": ("id", self.id_field),
             },
             filter_pred=lambda example: len(example.input) <= 256,
         )
 
-        self.val = NorecParser(
-            args, framework, language, "validation",
+        val = parser(
+            args, "validation",
             fields={
                 "input": [("every_input", self.every_word_input_field), ("char_form_input", self.char_form_field)],
                 "bert input": ("input", self.bert_input_field),
@@ -133,14 +146,15 @@ class Dataset:
                 "edge presence": ("edge_presence", self.edge_presence_field),
                 "edge labels": ("edge_labels", self.edge_label_field),
                 "anchor edges": ("anchor", self.anchor_field),
+                "source anchor edges": ("source_anchor", self.source_anchor_field),
+                "target anchor edges": ("target_anchor", self.target_anchor_field),
                 "token anchors": ("token_intervals", self.token_interval_field),
                 "id": ("id", self.id_field),
             },
-            precomputed_dataset=self.train.data,
         )
 
-        self.test = EvaluationParser(
-            args, framework, language,
+        test = EvaluationParser(
+            args,
             fields={
                 "input": [("every_input", self.every_word_input_field), ("char_form_input", self.char_form_field)],
                 "bert input": ("input", self.bert_input_field),
@@ -150,34 +164,40 @@ class Dataset:
             },
         )
 
-        del self.train.data, self.val.data, self.test.data
-        for f in list(self.train.fields.values()) + list(self.val.fields.values()) + list(self.test.fields.values()):
+        del train.data, val.data, test.data  # TODO: why?
+        for f in list(train.fields.values()) + list(val.fields.values()) + list(test.fields.values()):  # TODO: why?
             if hasattr(f, "preprocessing"):
                 del f.preprocessing
 
-        self.train_size = len(self.train)
-        self.val_size = len(self.val)
-        self.test_size = len(self.test)
+        self.train_size = len(train)
+        self.val_size = len(val)
+        self.test_size = len(test)
 
         self.log(f"\n{self.train_size} sentences in the train split")
         self.log(f"{self.val_size} sentences in the validation split")
         self.log(f"{self.test_size} sentences in the test split")
 
-        self.node_count = self.train.node_counter
-        self.token_count = self.train.input_count
-        self.edge_count = self.train.edge_counter
-        self.no_edge_count = self.train.no_edge_counter
-        self.anchor_freq = self.train.anchor_freq
+        self.node_count = train.node_counter
+        self.token_count = train.input_count
+        self.edge_count = train.edge_counter
+        self.no_edge_count = train.no_edge_counter
+        self.anchor_freq = train.anchor_freq
+
+        self.source_anchor_freq = train.source_anchor_freq if hasattr(train, "source_anchor_freq") else 0.5
+        self.target_anchor_freq = train.target_anchor_freq if hasattr(train, "target_anchor_freq") else 0.5
         self.log(f"{self.node_count} nodes in the train split")
 
-        self.every_word_input_field.build_vocab(self.val, self.test, min_freq=1, specials=[self.pad, self.unk, self.sos, self.eos])
-        self.char_form_field.build_vocab(self.train, min_freq=1, specials=[self.pad, self.unk, self.sos, self.eos])
-        self.id_field.build_vocab(self.train, self.val, self.test, min_freq=1, specials=[])
-        self.label_field.build_vocab(self.train)
+        self.every_word_input_field.build_vocab(val, test, min_freq=1, specials=[self.pad, self.unk, self.sos, self.eos])
+        self.char_form_field.build_vocab(train, min_freq=1, specials=[self.pad, self.unk, self.sos, self.eos])
+        self.char_form_field.nesting_field.vocab = self.char_form_field.vocab
+        self.id_field.build_vocab(train, val, test, min_freq=1, specials=[])
+        self.label_field.build_vocab(train)
         self.anchored_label_field.vocab = self.label_field.vocab
-        self.property_field.build_vocab(self.train)
-        self.edge_label_field.build_vocab(self.train)
+        self.property_field.build_vocab(train)
+        self.edge_label_field.build_vocab(train)
+        print(list(self.edge_label_field.vocab.freqs.keys()), flush=True)
 
+        self.char_form_vocab_size = len(self.char_form_field.vocab)
         self.create_label_freqs(args)
         self.create_edge_freqs(args)
         self.create_property_freqs(args)
@@ -194,9 +214,41 @@ class Dataset:
         self.log(self.label_field.vocab.freqs)
         self.log(self.anchored_label_field.vocab.freqs)
 
-        Random(42).shuffle(self.train.examples)
-        self.train.examples = self.train.examples[:len(self.train.examples) // n_gpus * n_gpus]
-        self.train.examples = self.train.examples[gpu * len(self.train.examples) // n_gpus: (gpu + 1) * len(self.train.examples) // n_gpus]
+        self.train = torch.utils.data.DataLoader(
+            train,
+            batch_size=args.batch_size,
+            shuffle=True,
+            num_workers=args.workers,
+            collate_fn=Collate(),
+            pin_memory=True,
+            drop_last=True
+        )
+        self.train_size = len(self.train.dataset)
+
+        self.val = torch.utils.data.DataLoader(
+            val,
+            batch_size=args.batch_size,
+            shuffle=False,
+            num_workers=args.workers,
+            collate_fn=Collate(),
+            pin_memory=True,
+        )
+        self.val_size = len(self.val.dataset)
+
+        self.test = torch.utils.data.DataLoader(
+            test,
+            batch_size=args.batch_size,
+            shuffle=False,
+            num_workers=args.workers,
+            collate_fn=Collate(),
+            pin_memory=True,
+        )
+        self.test_size = len(self.test.dataset)
+
+        if self.verbose:
+            batch = next(iter(self.train))
+            print(f"\nBatch content: {Batch.to_str(batch)}\n")
+            print(flush=True)
 
     def create_label_freqs(self, args):
         n_rules = len(self.label_field.vocab)

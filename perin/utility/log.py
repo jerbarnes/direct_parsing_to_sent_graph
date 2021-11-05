@@ -35,7 +35,6 @@ class Log:
         self.full_evaluation_results = f"{directory}/full_results_{{0}}_{{1}}.json"
         self.best_full_evaluation_results = f"{directory}/best_full_results_{{0}}_{{1}}.json"
         self.result_history = {epoch: {} for epoch in range(args.epochs)}
-        self.n_frameworks = len(args.frameworks)
 
         self.best_checkpoint_filename = f"{self.directory}/best_checkpoint.h5"
         self.last_checkpoint_filename = f"{self.directory}/last_checkpoint.h5"
@@ -59,7 +58,7 @@ class Log:
         self.is_train = False
         self._reset(len_dataset)
 
-    def __call__(self, batch_size, losses, frameworks, grad_norm: float = None, learning_rates: float = None,) -> None:
+    def __call__(self, batch_size, losses, grad_norm: float = None, learning_rates: float = None,) -> None:
         if self.is_train:
             self._train_step(batch_size, losses, grad_norm, learning_rates)
         else:
@@ -83,11 +82,14 @@ class Log:
             self.losses = None
             # self._save_model(save_as_best=False, performance=None)
 
-    def log_evaluation(self, precision, recall, f1_score, framework, language, mode):
+    def log_evaluation(self, scores, mode, epoch):
+        f1_score = scores["sentiment_tuple/f1"]
         if self.log_wandb:
-            wandb.log({f"{mode}/sentiment_tuple/precision": precision})
-            wandb.log({f"{mode}/sentiment_tuple/recall": recall})
-            wandb.log({f"{mode}/sentiment_tuple/f1": f1_score})
+            scores = {f"{mode}/{k}": v for k, v in scores.items()}
+            wandb.log({
+                "epoch": epoch,
+                **scores
+            })
 
         if mode == "validation" and f1_score > self.best_f1_score:
             if self.log_wandb:
@@ -134,7 +136,7 @@ class Log:
             if self.log_wandb:
                 dictionary = {f"train/{key}" if not key.startswith("weight/") else key: value / self.log_each for key, value in self.losses.items()}
                 dictionary["epoch"] = self.epoch
-                dictionary["learning_rate/encoder"] = learning_rates[-3]
+                dictionary["learning_rate/encoder"] = learning_rates[0]
                 dictionary["learning_rate/decoder"] = learning_rates[-2]
                 dictionary["learning_rate/grad_norm"] = learning_rates[-1]
                 dictionary["gradient norm"] = grad_norm

@@ -12,24 +12,26 @@ import torch
 
 from model.head.abstract_head import AbstractHead
 from model.module.grad_scaler import scale_grad
-from data.parser.to_mrp.norec_parser import NorecParser
-from model.module.cross_entropy import binary_cross_entropy
+from data.parser.to_mrp.node_centric_parser import NodeCentricParser
+from utility.cross_entropy import binary_cross_entropy
 
 
-class NorecHead(AbstractHead):
-    def __init__(self, dataset, args, framework, language, initialize):
+class NodeCentricHead(AbstractHead):
+    def __init__(self, dataset, args, initialize):
         config = {
             "label": True,
             "property": False,
             "edge presence": True,
             "edge label": False,
-            "anchor": True
+            "anchor": True,
+            "source_anchor": False,
+            "target_anchor": False
         }
-        super(NorecHead, self).__init__(dataset, args, framework, language, config, initialize)
+        super(NodeCentricHead, self).__init__(dataset, args, config, initialize)
 
         self.source_id = dataset.label_field.vocab.stoi["Source"] + 1
         self.target_id = dataset.label_field.vocab.stoi["Target"] + 1
-        self.parser = NorecParser(dataset, language)
+        self.parser = NodeCentricParser(dataset)
 
     def forward_label(self, decoder_output, decoder_lens):
         decoder_output = scale_grad(decoder_output, self.loss_weights["label"])
@@ -42,4 +44,12 @@ class NorecHead(AbstractHead):
         return {"edge presence": binary_cross_entropy(prediction["edge presence"], target["edge_presence"].float(), mask)}
 
     def inference_label(self, prediction):
-        return prediction.argmax(dim=-1)
+        prediction = prediction.exp()
+        return torch.where(
+            prediction[:, 0] > prediction[:, 1:].sum(-1),
+            torch.zeros(prediction.size(0), dtype=torch.long, device=prediction.device),
+            prediction[:, 1:].argmax(dim=-1) + 1
+        )
+
+    # def inference_label(self, prediction):
+    #     return prediction.argmax(dim=-1)

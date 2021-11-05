@@ -1,12 +1,12 @@
-framework: opener
+framework: darmstadt
 language: en
-graph_mode: node-centric
+graph_mode: sequential
 
 encoder: /cluster/projects/nn9851k/models/xlm-roberta-base
 epochs: 200
-n_layers: 0
-query_length: 2
-balance_loss_weights: false
+n_layers: 3
+query_length: 1
+balance_loss_weights: true
 grad_norm_lr: 3.0e-5
 decoder_learning_rate: 6.0e-4
 encoder_learning_rate: 6.0e-6            # initial encoder learning rate
@@ -22,7 +22,7 @@ hidden_size_anchor: 256
 dropout_anchor: 0.4
 dropout_edge_presence: 0.5
 dropout_label: 0.85
-batch_size: 16
 dropout_transformer: 0.25
+batch_size: 16
 beta_2: 0.98
 layerwise_lr_decay: 0.9

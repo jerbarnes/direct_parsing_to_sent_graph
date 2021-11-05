@@ -1,5 +1,5 @@
-framework: opener
-language: en
+framework: multibooked
+language: ca
 graph_mode: node-centric
 
 encoder: /cluster/projects/nn9851k/models/xlm-roberta-base

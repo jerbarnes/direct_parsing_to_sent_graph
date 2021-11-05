@@ -12,7 +12,7 @@ import argparse
 import torch
 
 from model.model import Model
-from data.shared_dataset import SharedDataset
+from data.dataset import Dataset
 from utility.initialize import initialize
 from config.params import Params
 from utility.predict import predict
@@ -31,8 +31,8 @@ if __name__ == "__main__":
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     directory = initialize(args, create_directory=True, init_wandb=False, directory_prefix="inference_")
 
-    dataset = SharedDataset(args)
-    dataset.load_datasets(args, 0, 1)
+    dataset = Dataset(args)
+    dataset.load_datasets(args)
 
     model = Model(dataset, args).to(device)
     model.load_state_dict(checkpoint["model"])

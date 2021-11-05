@@ -42,6 +42,39 @@ def span_f1(gold, pred, test_label="Source"):
 
 
 
+def get_flat(sentence, test_label="Source"):
+    mapping = {"Source": 0, "Target": 1, "Polar_expression": 2}
+    text = sentence["text"]
+    token_offsets = list(tk.span_tokenize(text))
+    flat_labels = ["O"] * len(token_offsets)
+    opinion_tuples = convert_opinion_to_tuple(sentence)
+    for tup in opinion_tuples:
+        for offset in tup[mapping[test_label]]:
+            flat_labels[offset] = test_label
+    return flat_labels
+
+
+def span_f1(gold, pred, test_label="Source"):
+    tp, fp, fn = 0, 0, 0
+    for gold_sent, pred_sent in zip(gold, pred):
+        gold_labels = get_flat(gold_sent, test_label)
+        pred_labels = get_flat(pred_sent, test_label)
+        for gold_label, pred_label in zip(gold_labels, pred_labels):
+            # TP
+            if gold_label == pred_label == test_label:
+                tp += 1
+            #FP
+            if gold_label != test_label and pred_label == test_label:
+                fp += 1
+            #FN
+            if gold_label == test_label and pred_label != test_label:
+                fn += 1
+    prec = tp / (tp + fp + 1e-6)
+    rec = tp / (tp + fn + 1e-6)
+    f1 = 2 * prec * rec / (prec + rec + 1e-6)
+    return prec, rec, f1
+
+
 def convert_char_offsets_to_token_idxs(char_offsets, token_offsets):
     """
     char_offsets: list of str
@@ -82,7 +115,7 @@ def convert_opinion_to_tuple(sentence):
             holder_char_idxs = opinion["Source"][1]
             target_char_idxs = opinion["Target"][1]
             exp_char_idxs = opinion["Polar_expression"][1]
-            polarity = opinion["Polarity"]
+            polarity = opinion["Polarity"].lower() if opinion["Polarity"] else "none"
             #
             holder = convert_char_offsets_to_token_idxs(holder_char_idxs, token_offsets)
             target = convert_char_offsets_to_token_idxs(target_char_idxs, token_offsets)

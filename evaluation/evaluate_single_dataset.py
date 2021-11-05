@@ -27,12 +27,22 @@ def evaluate(gold_file, pred_file):
     _, _, unlabeled_f1 = tuple_f1(tgold, tpreds, keep_polarity=False)
     prec, rec, f1 = tuple_f1(tgold, tpreds)
 
-    print("Source F1: {0:.3f}".format(source_f1))
-    print("Target F1: {0:.3f}".format(target_f1))
-    print("Expression F1: {0:.3f}".format(expression_f1))
-    print("Unlabeled Sentiment Tuple F1: {0:.3f}".format(unlabeled_f1))
-    print("Sentiment Tuple F1: {0:.3f}".format(f1))
-    return prec, rec, f1
+    # print("Source F1: {0:.3f}".format(source_f1))
+    # print("Target F1: {0:.3f}".format(target_f1))
+    # print("Expression F1: {0:.3f}".format(expression_f1))
+    # print("Unlabeled Sentiment Tuple F1: {0:.3f}".format(unlabeled_f1))
+    # print("Sentiment Tuple F1: {0:.3f}".format(f1))
+
+    results = {
+        "source/f1": source_f1,
+        "target/f1": target_f1,
+        "expression/f1": expression_f1,
+        "sentiment_tuple/unlabeled_f1": unlabeled_f1,
+        "sentiment_tuple/precision": prec,
+        "sentiment_tuple/recall": rec,
+        "sentiment_tuple/f1": f1
+    }
+    return results
 
 
 def main():
@@ -42,7 +52,10 @@ def main():
 
     args = parser.parse_args()
 
-    _, _, f1 = evaluate(args.gold_file, args.pred_file)
+    results = evaluate(args.gold_file, args.pred_file)
+    print(json.dumps(results, indent=2))
+    print()
+    print(list(results.values()))
 
 
 if __name__ == "__main__":

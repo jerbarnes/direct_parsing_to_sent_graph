@@ -16,7 +16,7 @@ class AbstractParser(torch.utils.data.Dataset):
     def __init__(self, fields, data, filter_pred=None):
         super(AbstractParser, self).__init__()
 
-        self.examples = [example_from_json(o, fields) for o in data.values()]
+        self.examples = [example_from_json(d, fields) for _, d in sorted(data.items())]
 
         if isinstance(fields, dict):
             fields, field_dict = [], fields
@@ -41,7 +41,12 @@ class AbstractParser(torch.utils.data.Dataset):
                 del self.fields[n]
 
     def __getitem__(self, i):
-        return self.examples[i]
+        item = self.examples[i]
+        processed_item = {}
+        for (name, field) in self.fields.items():
+            if field is not None:
+                processed_item[name] = field.process(getattr(item, name), device=None)
+        return processed_item
 
     def __len__(self):
         return len(self.examples)

@@ -1,10 +1,10 @@
-framework: opener
-language: en
+framework: norec
+language: "no"
 graph_mode: node-centric
 
 encoder: /cluster/projects/nn9851k/models/xlm-roberta-base
 epochs: 200
-n_layers: 0
+n_layers: 3
 query_length: 2
 balance_loss_weights: false
 grad_norm_lr: 3.0e-5

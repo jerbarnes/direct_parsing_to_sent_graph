@@ -41,7 +41,7 @@ def multi_label_cross_entropy(probs, target, mask, focal=False, label_weight=Non
         return masked_sum(loss, mask, reduction=reduction)
 
 
-def cross_entropy(log_prob, target, mask, focal=False, label_weight=None, reduction=True, smoothing=0.0):
+def cross_entropy(log_prob, target, mask, focal=False, label_weight=None, reduction=True):
     target = target.unsqueeze(-1)
     if focal:
         focal_coeff = log_prob.exp().gather(-1, target).squeeze(-1)
@@ -49,10 +49,7 @@ def cross_entropy(log_prob, target, mask, focal=False, label_weight=None, reduct
     else:
         focal_coeff = 1.0
 
-    if smoothing == 0.0:
-        loss = -focal_coeff * log_prob.gather(-1, target).squeeze(-1)
-    else:
-        loss = -focal_coeff * smooth_cross_entropy(log_prob, target, smoothing=smoothing)
+    loss = -focal_coeff * log_prob.gather(-1, target).squeeze(-1)
 
     if label_weight is not None:
         loss = loss * label_weight
@@ -61,13 +58,28 @@ def cross_entropy(log_prob, target, mask, focal=False, label_weight=None, reduct
         return masked_sum(loss, mask, reduction=reduction)
 
 
-def smooth_cross_entropy(log_prob, gold, smoothing=0.1):
+def smooth_cross_entropy(log_prob, target, mask, focal=False, label_weight=None, reduction=True, smoothing=0.0):
+    if smoothing == 0.0:
+        return cross_entropy(log_prob, target, mask, focal=focal, label_weight=label_weight, reduction=reduction)
+
+    target = target.unsqueeze(-1)
     n_class = log_prob.size(-1)
+    gold_one_hot = torch.full_like(log_prob, fill_value=smoothing / (n_class - 1))
+    gold_one_hot.scatter_(dim=-1, index=target, value=1.0 - smoothing)
 
-    one_hot = torch.full_like(log_prob, fill_value=smoothing / (n_class - 1))
-    one_hot.scatter_(dim=-1, index=gold, value=1.0 - smoothing)
+    if focal:
+        focal_coeff = (log_prob.exp() * gold_one_hot).sqrt().sum(-1)
+        focal_coeff = (1.0 - focal_coeff) ** 2
+    else:
+        focal_coeff = 1.0
 
-    return F.kl_div(input=log_prob, target=one_hot, reduction='none').sum(-1)
+    loss = focal_coeff * F.kl_div(input=log_prob, target=gold_one_hot, reduction='none').sum(-1)
+
+    if label_weight is not None:
+        loss = loss * label_weight
+        return masked_sum(loss, mask, label_weight=label_weight, reduction=reduction)
+    else:
+        return masked_sum(loss, mask, reduction=reduction)
 
 
 def binary_cross_entropy(logits, target, mask, focal=False, reduction=True):
