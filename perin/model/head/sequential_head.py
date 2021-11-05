@@ -41,3 +41,18 @@ class SequentialHead(AbstractHead):
             torch.zeros(prediction.size(0), dtype=torch.long, device=prediction.device),
             prediction[:, 1:].argmax(dim=-1) + 1
         )
+
+    # def anchor_cost_matrix(self, output, batch, decoder_lens, b: int):
+    #     num_nodes = batch["labels"][1][b]
+    #     word_lens = batch["every_input"][1][b]
+
+    #     cost_matrix = 0.0
+    #     for anchor_mode in ("anchor", "source_anchor", "target_anchor"):
+    #         tgt_align = batch[anchor_mode][0][b, :num_nodes, :word_lens]  # shape: (num_nodes, num_inputs)
+    #         align_prob = output[anchor_mode][b, :decoder_lens[b], :word_lens].sigmoid()  # shape: (num_queries, num_inputs)
+    #         align_prob = align_prob.unsqueeze(1).expand(-1, num_nodes, -1)  # shape: (num_queries, num_nodes, num_inputs)
+    #         align_prob = torch.where(tgt_align.unsqueeze(0).bool(), align_prob, 1.0 - align_prob)  # shape: (num_queries, num_nodes, num_inputs)
+    #         cost_matrix += align_prob.log().mean(-1)  # shape: (num_queries, num_nodes)
+
+    #     cost_matrix = (cost_matrix / 3).exp()
+    #     return cost_matrix

@@ -8,12 +8,6 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-import json
-import io
-import os
-import os.path
-
-from collections import Counter
 from data.parser.from_mrp.abstract_parser import AbstractParser
 import utility.parser_utils as utils
 
@@ -31,14 +25,16 @@ class NodeCentricParser(AbstractParser):
         self.node_counter, self.edge_counter, self.no_edge_counter = 0, 0, 0
         anchor_count, n_node_token_pairs = 0, 0
 
-        unlabeled_count = 0
-        for node, sentence in utils.node_generator(self.data):
-            if "label" not in node:
-                node["label"] = "Null"
-                unlabeled_count += 1
-            node["properties"] = {"dummy": 0}
+        for sentence_id, sentence in list(self.data.items()):
+            for node in sentence["nodes"]:
+                if "label" not in node:
+                    del self.data[sentence_id]
+                    break
 
+        for node, _ in utils.node_generator(self.data):
+            node["properties"] = {"dummy": 0}
             self.node_counter += 1
+
         # print(f"Number of unlabeled nodes: {unlabeled_count}", flush=True)
 
         utils.create_bert_tokens(self.data, args.encoder)
@@ -47,7 +43,7 @@ class NodeCentricParser(AbstractParser):
         for sentence in self.data.values():
             N = len(sentence["nodes"])
 
-            edge_count = utils.create_edges(sentence, normalize=False)
+            edge_count = utils.create_edges(sentence)
             self.edge_counter += edge_count
             # self.no_edge_counter += len([n for n in sentence["nodes"] if n["label"] in ["Source", "Target"]]) * len([n for n in sentence["nodes"] if n["label"] not in ["Source", "Target"]]) - edge_count
             self.no_edge_counter += N * (N - 1) - edge_count

@@ -8,12 +8,6 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-import json
-import io
-import os
-import os.path
-
-from collections import Counter
 from data.parser.from_mrp.abstract_parser import AbstractParser
 import utility.parser_utils as utils
 
@@ -30,6 +24,12 @@ class SequentialParser(AbstractParser):
 
         self.node_counter, self.edge_counter, self.no_edge_counter = 0, 0, 0
         anchor_count, source_anchor_count, target_anchor_count, n_node_token_pairs = 0, 0, 0, 0
+
+        for sentence_id, sentence in list(self.data.items()):
+            for node in sentence["nodes"]:
+                if "label" not in node:
+                    del self.data[sentence_id]
+                    break
 
         for node, _ in utils.node_generator(self.data):
             node["target anchors"] = []
@@ -49,7 +49,7 @@ class SequentialParser(AbstractParser):
                     del sentence["nodes"][i]
             sentence["edges"] = []
 
-        for node, sentence in utils.node_generator(self.data):
+        for node, _ in utils.node_generator(self.data):
             node["properties"] = {"dummy": 0}
             self.node_counter += 1
 
@@ -59,7 +59,7 @@ class SequentialParser(AbstractParser):
         for sentence in self.data.values():
             N = len(sentence["nodes"])
 
-            utils.create_edges(sentence, normalize=False)
+            utils.create_edges(sentence)
             self.no_edge_counter += N * (N - 1)
 
             sentence["anchor edges"] = [N, len(sentence["input"]), []]

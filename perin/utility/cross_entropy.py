@@ -58,7 +58,7 @@ def cross_entropy(log_prob, target, mask, focal=False, label_weight=None, reduct
         return masked_sum(loss, mask, reduction=reduction)
 
 
-def smooth_cross_entropy(log_prob, target, mask, focal=False, label_weight=None, reduction=True, smoothing=0.1):
+def smooth_cross_entropy(log_prob, target, mask, focal=False, label_weight=None, reduction=True, smoothing=0.0):
     if smoothing == 0.0:
         return cross_entropy(log_prob, target, mask, focal=focal, label_weight=label_weight, reduction=reduction)
 

@@ -12,9 +12,9 @@ import math
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 class LinearLr:
-    def __init__(self, param_group, learning_rate: float, total_steps: int, delay_steps: int):
-        self.total_steps = total_steps - delay_steps
-        self.delay_steps = delay_steps
+    def __init__(self, param_group, learning_rate: float, total_steps: int, delay: bool):
+        self.total_steps = total_steps
+        self.delay_steps = total_steps / 20 if delay else 0
         self.max_lr = learning_rate
         self.steps = 0
         self.param_group = param_group

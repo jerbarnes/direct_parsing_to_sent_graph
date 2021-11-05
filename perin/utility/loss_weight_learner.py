@@ -9,7 +9,7 @@ class LossWeightLearner:
         self.loss_weights = model.head.loss_weights
         self.loss_keys = list(self.loss_weights.keys())
         self.optimizer = torch.optim.SGD(list(self.loss_weights.values()), lr=args.grad_norm_lr)
-        self.scheduler = LinearLr(self.optimizer.param_groups[0], args.grad_norm_lr, args.epochs * steps_per_epoch, args.epochs * steps_per_epoch // 20)
+        self.scheduler = LinearLr(self.optimizer.param_groups[0], args.grad_norm_lr, args.epochs * steps_per_epoch, True)
         self.loss_0 = model.head.loss_0
         self.last_layer = [p for p in model.decoder.layers[-1].parameters() if p.requires_grad]
         self.preference_weights = model.head.preference_weights

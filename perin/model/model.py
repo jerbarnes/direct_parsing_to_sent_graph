@@ -15,8 +15,8 @@ from model.module.encoder import Encoder
 
 from model.module.transformer import Decoder
 from model.head.node_centric_head import NodeCentricHead
+from model.head.labeled_edge_head import LabeledEdgeHead
 from model.head.sequential_head import SequentialHead
-from model.module.module_wrapper import ModuleWrapper
 from utility.utils import create_padding_mask
 from data.batch import Batch
 
@@ -34,6 +34,8 @@ class Model(nn.Module):
             self.head = SequentialHead(dataset, args, initialize)
         elif args.graph_mode == "node-centric":
             self.head = NodeCentricHead(dataset, args, initialize)
+        elif args.graph_mode == "labeled-edge":
+            self.head = LabeledEdgeHead(dataset, args, initialize)
 
         self.query_length = args.query_length
         self.label_smoothing = args.label_smoothing

@@ -150,19 +150,15 @@ def create_bert_tokens(data, encoder: str):
         sentence["bert input"] = bert_input
 
 
-def create_edges(sentence, label_f=None, normalize=False):
+def create_edges(sentence, label_f=None):
     N = len(sentence["nodes"])
 
     sentence["edge presence"] = [N, N, []]
     sentence["edge labels"] = [N, N, []]
 
     for e in sentence["edges"]:
-        if normalize and "normal" in e:
-            target, source = e["source"], e["target"]
-            label = e["normal"].lower() if "normal" in e else "none"
-        else:
-            source, target = e["source"], e["target"]
-            label = e["label"].lower() if "label" in e else "none"
+        source, target = e["source"], e["target"]
+        label = e["label"] if "label" in e else "none"
 
         if label_f is not None:
             label = label_f(label)

@@ -28,7 +28,7 @@ class EdgeClassifier(nn.Module):
                 presence_init = None
 
             self.edge_presence = EdgeBiaffine(
-                args.hidden_size, args.hidden_size_edge_presence, 1, args.dropout_edge_label, bias_init=presence_init
+                args.hidden_size, args.hidden_size_edge_presence, 1, args.dropout_edge_presence, bias_init=presence_init
             )
 
         self.label = label
@@ -36,7 +36,7 @@ class EdgeClassifier(nn.Module):
             label_init = (dataset.edge_label_freqs / (1.0 - dataset.edge_label_freqs)).log() if initialize else None
             n_labels = len(dataset.edge_label_field.vocab)
             self.edge_label = EdgeBiaffine(
-                args.hidden_size, args.hidden_size_edge_label, n_labels, args.dropout_edge_presence, bias_init=label_init
+                args.hidden_size, args.hidden_size_edge_label, n_labels, args.dropout_edge_label, bias_init=label_init
             )
 
     def forward(self, x, loss_weights):

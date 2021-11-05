@@ -40,7 +40,8 @@ def read(fp, text=None, node_centric=False):
                         anchors=anchor(expression),
                     )
                     key = tuple(opinion["Polar_expression"][1])
-                    assert key not in map
+                    if key in map:
+                        print("we got double expression here", native["sent_id"])
                     map[key] = expression
 
                     graph.add_edge(top.id, expression.id, opinion["Polarity"])
@@ -75,7 +76,7 @@ def read(fp, text=None, node_centric=False):
 
         except Exception as error:
             print(
-                "codec.norec.read(): ignoring {}: {}" "".format(native, error),
+                f"codec.norec.read(): ignoring {native}: {error}",
                 file=sys.stderr,
             )
 
@@ -87,9 +88,14 @@ def get_text_span(node, text):
 
 
 def write(graph, input, node_centric=False):
-    if node_centric:
-        return write_node_centric(graph, input)
-    return write_labeled_edge(graph, input)
+    try:
+        if node_centric:
+            return write_node_centric(graph, input)
+        return write_labeled_edge(graph, input)
+
+    except Exception as error:
+        print(f"Problem with decoding sentence {graph.id}")
+        raise error
 
 
 def write_node_centric(graph, input):
@@ -127,13 +133,14 @@ def write_node_centric(graph, input):
     }
     return sentence
 
+
 def write_labeled_edge(graph, input):
     nodes = {node.id: node for node in graph.nodes}
 
     # create opinions
     opinions = {}
     for edge in graph.edges:
-        if edge.label in ["Source", "Target"]:
+        if edge.lab in ["Source", "Target"]:
             continue
 
         node = nodes[edge.tgt]
@@ -141,12 +148,12 @@ def write_labeled_edge(graph, input):
             "Source": [[], []],
             "Target": [[], []],
             "Polar_expression": [*get_text_span(node, input)],
-            "Polarity": edge.label,
+            "Polarity": edge.lab,
         }
 
     # add sources & targets
     for edge in graph.edges:
-        if edge.label not in ["Source", "Target"]:
+        if edge.lab not in ["Source", "Target"]:
             continue
         if edge.src not in opinions:
             continue
@@ -154,8 +161,8 @@ def write_labeled_edge(graph, input):
         node = nodes[edge.tgt]
         anchored_text, anchors = get_text_span(node, input)
 
-        opinions[edge.src][node.label][0] += anchored_text
-        opinions[edge.src][node.label][1] += anchors
+        opinions[edge.src][edge.lab][0] += anchored_text
+        opinions[edge.src][edge.lab][1] += anchors
 
     sentence = {
         "sent_id": graph.id,

@@ -15,7 +15,6 @@ import torch.nn.functional as F
 
 from model.module.edge_classifier import EdgeClassifier
 from model.module.anchor_classifier import AnchorClassifier
-from model.module.padding_packer import PaddingPacker
 from model.module.grad_scaler import scale_grad
 from utility.cross_entropy import multi_label_cross_entropy, cross_entropy, binary_cross_entropy, smooth_cross_entropy
 from utility.hungarian_matching import get_matching, reorder, match_anchor, match_label
@@ -133,11 +132,14 @@ class AbstractHead(nn.Module):
         device = batch["every_input"][0].device
         T_label = batch["labels"][0].size(1)
         T_input = batch["every_input"][0].size(1)
+        T_edge = batch["edge_presence"].size(1)
 
         input_mask = create_padding_mask(batch_size, T_input, batch["every_input"][1], device)  # shape: (B, T_input)
         label_mask = create_padding_mask(batch_size, T_label, batch["labels"][1], device)  # shape: (B, T_label)
         edge_mask = torch.eye(T_label, T_label, device=device, dtype=torch.bool).unsqueeze(0)  # shape: (1, T_label, T_label)
         edge_mask = edge_mask | label_mask.unsqueeze(1) | label_mask.unsqueeze(2)  # shape: (B, T_label, T_label)
+        if T_edge != T_label:
+            edge_mask = F.pad(edge_mask, (T_edge - T_label, 0, T_edge - T_label, 0), value=0)
         edge_label_mask = (batch["edge_presence"] == 0) | edge_mask
 
         if output["edge label"] is not None:
@@ -205,7 +207,7 @@ class AbstractHead(nn.Module):
         if initialize:
             classifier[1].bias.data = dataset.label_freqs.log()
 
-        return PaddingPacker(classifier)
+        return classifier
 
     def init_property_classifier(self, dataset, args, config, initialize: bool):
         if not config["property"]:
@@ -281,7 +283,7 @@ class AbstractHead(nn.Module):
     def inference_edge_label(self, prediction, example_index: int):
         if prediction is None:
             return None
-        return prediction[example_index, :, :, :].argmax(dim=-1).cpu()
+        return prediction[example_index, :, :, :].cpu()
 
     def loss_edge_presence(self, prediction, target, mask):
         if self.edge_classifier is None or prediction["edge presence"] is None:
@@ -325,12 +327,6 @@ class AbstractHead(nn.Module):
         label_prob = output["label"][b, : decoder_lens[b], :].exp().unsqueeze(0)  # shape: (1, num_queries, num_classes)
         tgt_label = target_labels.repeat_interleave(self.query_length, dim=1)  # shape: (num_nodes, num_queries, num_classes)
         cost_matrix = ((tgt_label * label_prob).sum(-1) * label_prob[:, :, 1:].sum(-1)).t().sqrt()  # shape: (num_queries, num_nodes)
-
-        # indices = batch["labels"][0][b, :batch["labels"][1][b]]  # shape: (num_nodes)
-        # label_prob = output["label"][b, : decoder_lens[b], :]  # shape: (num_queries, num_classes)
-        # indices = indices.view(1, -1, 1).expand(label_prob.size(0), -1, -1)  # shape: (num_queries, num_nodes, 1)
-        # label_prob = label_prob.unsqueeze(1).expand(-1, indices.size(1), -1)  # shape: (num_queries, num_nodes, num_classes)
-        # cost_matrix = torch.gather(label_prob, 2, indices).squeeze(2).exp()  # shape: (num_queries, num_nodes)
 
         return cost_matrix
 

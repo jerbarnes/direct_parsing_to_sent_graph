@@ -15,6 +15,7 @@ import torchtext
 from random import Random
 
 from data.parser.from_mrp.node_centric_parser import NodeCentricParser
+from data.parser.from_mrp.labeled_edge_parser import LabeledEdgeParser
 from data.parser.from_mrp.sequential_parser import SequentialParser
 from data.parser.from_mrp.evaluation_parser import EvaluationParser
 from data.parser.from_mrp.request_parser import RequestParser
@@ -105,7 +106,8 @@ class Dataset:
     def load_dataset(self, args):
         parser = {
             "sequential": SequentialParser,
-            "node-centric": NodeCentricParser
+            "node-centric": NodeCentricParser,
+            "labeled-edge": LabeledEdgeParser
         }[args.graph_mode]
 
         train = parser(
@@ -193,6 +195,7 @@ class Dataset:
         self.anchored_label_field.vocab = self.label_field.vocab
         self.property_field.build_vocab(train)
         self.edge_label_field.build_vocab(train)
+        print(list(self.edge_label_field.vocab.freqs.keys()), flush=True)
 
         self.char_form_vocab_size = len(self.char_form_field.vocab)
         self.create_label_freqs(args)
