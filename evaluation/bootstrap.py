@@ -1,12 +1,12 @@
 import argparse
 import json
 import time
+from numba.core.decorators import njit
 import numpy as np
 from typing import Tuple, List, TypeVar, Optional
 from evaluate_single_dataset import evaluate
 from evaluate import (convert_opinion_to_tuple, get_flat, sent_tuples_in_list,
                       weighted_score)
-from numba import jit
 
 A = TypeVar("A")
 
@@ -213,7 +213,11 @@ def bootstrap(gold: str,
 
     # sample_ids samples b datasets of size n with indices ranging the five
     # runs creating a sample out of all runs
-    sample_ids = np.random.choice(n, n * b).reshape(b, n)
+    @njit
+    def get_sample_ids(n, b):
+        return np.random.choice(n, n * b).reshape(b, n)
+
+    sample_ids = get_sample_ids(n, b)
 
     if debug:
         print(f"get samples {time.time() - s}")
@@ -222,7 +226,7 @@ def bootstrap(gold: str,
     # fill a zero matrix with how often each sentence was drawn in one sample
     # with b=1e5 numba's jit reduces the runtime for this step
     # from 80 to 1-2 seconds
-    @jit(nopython=True)
+    @njit
     def get_samples(n, b, sample_ids):
         samples = np.zeros((n, b))
         for j in range(b):
