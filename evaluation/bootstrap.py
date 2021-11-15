@@ -1,10 +1,11 @@
 import argparse
 import json
 import time
+import gc
 from numba.core.decorators import njit
 import numpy as np
 from typing import Tuple, List, TypeVar, Optional
-from evaluate_single_dataset import evaluate
+# from evaluate_single_dataset import evaluate
 from evaluate import (convert_opinion_to_tuple, get_flat, sent_tuples_in_list,
                       weighted_score)
 
@@ -93,6 +94,8 @@ def read_data(gold_fn: str, pred_fn: str) -> Tuple[List[float], int]:
     with open(pred_fn) as f:
         pred = json.load(f)
 
+    assert len(gold) == len(pred)
+
     tgold = dict([(s["sent_id"], convert_opinion_to_tuple(s)) for s in gold])
     tpred = dict([(s["sent_id"], convert_opinion_to_tuple(s)) for s in pred])
 
@@ -179,8 +182,8 @@ def fill_scores(scores, evals, debug=False):
 
 
 def bootstrap(gold: str,
-              pred_a: str,
-              pred_b: str,
+              pred_a: List[str],
+              pred_b: List[str],
               b: int = 1,
               debug: bool = False
               ) -> None:  # Dict[str, Tuple[float, float, float]]:
@@ -188,8 +191,14 @@ def bootstrap(gold: str,
         s = time.time()
 
     n_measures = 5  # number of measures
-    L1, n = read_data(gold, pred_a)
-    L2, _ = read_data(gold, pred_b)
+    L1 = []
+    for pred in pred_a:
+        l1, n = read_data(gold, pred)
+        L1.extend(l1)
+    L2 = []
+    for pred in pred_b:
+        l2, _ = read_data(gold, pred)
+        L2.extend(l2)
     assert n == _
 
     # number of runs
@@ -245,6 +254,10 @@ def bootstrap(gold: str,
     # is taken resulting in a matrix of b rows with sums of tp, fp, fn etc.
     evals1 = (np.einsum('ik,il->lk', M1, samples))
     evals2 = (np.einsum('ik,il->lk', M2, samples))
+
+    del sample_ids
+    del samples
+    gc.collect()
 
     if debug:
         print(f"extract sample counts {time.time() - s}")
@@ -314,11 +327,12 @@ def bootstrap(gold: str,
 def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--gold_file", help="gold json file")
-    parser.add_argument("--pred_file_a", help="prediction json file a)")
-    parser.add_argument("--pred_file_b", help="prediction json file b)")
+    parser.add_argument("--pred_file_a", nargs="+", help="prediction json file a)")
+    parser.add_argument("--pred_file_b", nargs="+", help="prediction json file b)")
     parser.add_argument("--b",
                         help="number of resampling 'b' for bootstrap",
-                        type=float)
+                        type=float,
+                        default=1)
     parser.add_argument("--debug", help="debug prints", action="store_true")
 
     return parser.parse_args()
@@ -327,15 +341,15 @@ def get_args() -> argparse.Namespace:
 def main():
     args = get_args()
 
-    results = evaluate(args.gold_file, args.pred_file_a)
-    print(json.dumps(results, indent=2))
-    print()
-    print(list(results.values()))
+    # results = evaluate(args.gold_file, args.pred_file_a)
+    # print(json.dumps(results, indent=2))
+    # print()
+    # print(list(results.values()))
 
-    results = evaluate(args.gold_file, args.pred_file_b)
-    print(json.dumps(results, indent=2))
-    print()
-    print(list(results.values()))
+    # results = evaluate(args.gold_file, args.pred_file_b)
+    # print(json.dumps(results, indent=2))
+    # print()
+    # print(list(results.values()))
 
     bootstrap(args.gold_file, args.pred_file_a, args.pred_file_b, args.b,
               args.debug)
