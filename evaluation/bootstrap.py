@@ -4,7 +4,7 @@ import time
 import gc
 from numba.core.decorators import njit
 import numpy as np
-from typing import Tuple, List, TypeVar, Optional
+from typing import Tuple, List, TypeVar, Optional, Dict, Any
 # from evaluate_single_dataset import evaluate
 from evaluate import (convert_opinion_to_tuple, get_flat, sent_tuples_in_list,
                       weighted_score)
@@ -185,8 +185,9 @@ def bootstrap(gold: str,
               pred_a: List[str],
               pred_b: List[str],
               b: int = 1,
-              debug: bool = False
-              ) -> None:  # Dict[str, Tuple[float, float, float]]:
+              debug: bool = False,
+              no_print: bool = False,
+              ) -> List[Tuple[str, float, float, float, str]]:
     if debug:
         s = time.time()
 
@@ -304,38 +305,81 @@ def bootstrap(gold: str,
     s2 = s2 / b
     end = color.END
 
-    print(
-        f"{color.BOLD}{color.BLUE}{pred_a} || {color.RED}{pred_b}{color.END}")
+    if not no_print:
+        print(
+            f"{color.BOLD}{color.BLUE}{pred_a} || {color.RED}{pred_b}{color.END}")
 
     measures = [
         "source/f1", "target/f1", "expression/f1",
         "sentiment_tuple/unlabeled_f1", "sentiment_tuple/f1"
     ]
+    results = []
     for i, name in enumerate(measures):
         x = true_scores1[0][i]
         y = true_scores2[0][i]
         z = s1[i] if x > y else s2[i]
         if z < 0.05 and x > y:
             bold = color.BLUE
+            winner = "A"
         elif z < 0.05 and y > x:
             bold = color.RED
+            winner = "B"
         else:
             bold = color.END
-        print(f"{bold}{name:<13}: {x:.2%}\t{y:.2%}\t{z:.4f}{end}")
+            winner = "neither"
+        results.append((name, x, y, z, winner))
+        if not no_print:
+            print(f"{bold}{name:<13}: {x:.2%}\t{y:.2%}\t{z:.4f}{end}")
+    return results
 
 
 def get_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--gold_file", help="gold json file")
-    parser.add_argument("--pred_file_a", nargs="+", help="prediction json file a)")
-    parser.add_argument("--pred_file_b", nargs="+", help="prediction json file b)")
+    parser.add_argument("--pred_file_a", nargs="+",
+                        help="prediction json file a)")
+    parser.add_argument("--pred_file_b", nargs="+",
+                        help="prediction json file b)")
     parser.add_argument("--b",
                         help="number of resampling 'b' for bootstrap",
                         type=float,
                         default=1)
     parser.add_argument("--debug", help="debug prints", action="store_true")
+    parser.add_argument("--together", help="evaluate pairs of inputs or all together", action="store_true")
 
     return parser.parse_args()
+
+
+def multi_run_resolve(results: List[List[Tuple[str, float, float, float, str]]]):
+    measures = [m[0] for m in results[0]]
+    d: Dict[str, Dict[str, List[Any]]] = {x: {"a": [],
+                                              "b": [],
+                                              "p": [],
+                                              "wa": [],
+                                              "wb": [],
+                                              "neither": []
+                                              }
+                                          for x in measures}
+
+    for i, result in enumerate(results):
+        for m, a, b, p, w in result:
+            d[m]["a"].append(a)
+            d[m]["b"].append(b)
+            d[m]["p"].append(p)
+            if w == "A":
+                d[m]["wa"].append(i)
+            elif w == "B":
+                d[m]["wb"].append(i)
+            elif w == "neither":
+                d[m]["neither"].append(i)
+    for m in d:
+        print("{:<20} {:.1%} {:.1%} {} {} {}".format(m,
+                                                  sum(d[m]["a"]) / len(d[m]["a"]),
+                                                  sum(d[m]["b"]) / len(d[m]["b"]),
+                                                  len(d[m]["wa"]),
+                                                  len(d[m]["wb"]),
+                                                  len(d[m]["neither"]),
+                                                  ))
 
 
 def main():
@@ -351,8 +395,15 @@ def main():
     # print()
     # print(list(results.values()))
 
-    bootstrap(args.gold_file, args.pred_file_a, args.pred_file_b, args.b,
-              args.debug)
+    if args.together:
+        bootstrap(args.gold_file, args.pred_file_a, args.pred_file_b, args.b,
+                  args.debug)
+    else:
+        results = []
+        for a in args.pred_file_a:
+            for b in args.pred_file_b:
+                results.append(bootstrap(args.gold_file, [a], [b], args.b, args.debug, True))
+        multi_run_resolve(results)
 
 
 if __name__ == "__main__":
