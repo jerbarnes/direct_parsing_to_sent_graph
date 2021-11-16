@@ -40,7 +40,7 @@ def predict(model, data, input_path, raw_input_path, args, logger, output_direct
             f.write("\n")
             f.flush()
 
-    run(["./convert.sh", output_path] + (["--node_centric"] if args.graph_mode != "labeled-edge" else []))
+    run(["./convert.sh", output_path] + (["--node_centric "] if args.graph_mode != "labeled-edge" else []))
 
     if raw_input_path:
         results = evaluate(raw_input_path, f"{output_path}_converted")
@@ -48,3 +48,5 @@ def predict(model, data, input_path, raw_input_path, args, logger, output_direct
 
         if logger is not None:
             logger.log_evaluation(results, mode, epoch)
+
+        return results["sentiment_tuple/f1"]

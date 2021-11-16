@@ -1,11 +1,11 @@
-
-framework: norec
-language: "no"
+framework: darmstadt
+language: en
 graph_mode: sequential
 
 encoder: /cluster/projects/nn9851k/models/xlm-roberta-base
 epochs: 200
 freeze_bert: false
+predict_intensity: true
 n_layers: 3
 query_length: 1
 balance_loss_weights: false
@@ -22,9 +22,8 @@ focal: true
 hidden_size_edge_presence: 256
 hidden_size_anchor: 256
 dropout_anchor: 0.4
-dropout_edge_presence: 0.9
+dropout_edge_presence: 0.5
 dropout_label: 0.85
-dropout_property: 0.9
 dropout_transformer: 0.25
 batch_size: 16
 beta_2: 0.98

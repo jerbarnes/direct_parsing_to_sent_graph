@@ -46,7 +46,7 @@ class LabeledEdgeParser(AbstractParser):
             for target in range(1, N):
                 if source == target:
                     continue
-                if edge_prediction[0, target] < 0.5:
+                if edge_prediction[source, target] < 0.5:
                     continue
                 for i in range(prediction["edge labels"].size(2)):
                     if i not in [self.source_id, self.target_id]:

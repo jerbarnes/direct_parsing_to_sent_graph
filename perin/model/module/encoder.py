@@ -45,6 +45,9 @@ class Encoder(nn.Module):
                 self.bert.embeddings.LayerNorm.requires_grad_(True)
         else:
             self.bert = BertModel.from_pretrained(args.encoder, gradient_checkpointing=True, add_pooling_layer=False)
+        
+        if args.freeze_bert:
+            self.bert.requires_grad_(False)
 
         self.use_char_embedding = args.char_embedding
         if self.use_char_embedding:

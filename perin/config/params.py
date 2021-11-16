@@ -8,6 +8,7 @@ class Params:
         self.accumulation_steps = 1                  # number of gradient accumulation steps for achieving a bigger batch_size
         self.activation = "relu"                     # transformer (decoder) activation function, supported values: {'relu', 'gelu', 'sigmoid', 'mish'}
         self.balance_loss_weights = True             # use weight loss balancing (GradNorm)
+        self.predict_intensity = False
         self.batch_size = 32                         # batch size (further divided into multiple GPUs)
         self.beta_2 = 0.98                           # beta 2 parameter for Adam(W) optimizer
         self.blank_weight = 1.0                      # weight of cross-entropy loss for predicting an empty label
@@ -29,8 +30,10 @@ class Params:
         self.encoder_freeze_embedding = True         # freeze the first embedding layer in XLM-R
         self.encoder_learning_rate = 6e-5            # initial encoder learning rate
         self.encoder_weight_decay = 1e-2             # amount of weight decay
+        self.lr_decay_multiplier = 100
         self.epochs = 100                            # number of epochs for train
         self.focal = True                            # use focal loss for the label prediction
+        self.freeze_bert = False                     # use focal loss for the label prediction
         self.grad_norm_alpha = 1.5                   # grad-norm sensitivity
         self.grad_norm_lr = 1e-3                     # learning rate for the grad-norm optimizer
         self.group_ops = False                       # group 'opN' edge labels into one

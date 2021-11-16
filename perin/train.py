@@ -38,7 +38,7 @@ def parse_arguments():
     parser.add_argument("--home_directory", type=str, default="/cluster/projects/nn9851k/davisamu/sent_graph_followup/data")
     parser.add_argument("--name", default="no-query-tanh", type=str, help="name of this run.")
     parser.add_argument("--save_checkpoints", dest="save_checkpoints", action="store_true", default=False)
-    parser.add_argument("--seed", dest="seed", type=int, default=5678)
+    parser.add_argument("--seed", dest="seed", type=int, default=17181920)
     parser.add_argument("--log_wandb", dest="log_wandb", action="store_true", default=False)
     parser.add_argument("--validate_each", type=int, default=10, help="Validate every ${N}th epoch.")
     parser.add_argument("--wandb_log_mode", type=str, default=None, help="How to log the model weights, supported values: {'all', 'gradients', 'parameters', None}")
@@ -62,6 +62,8 @@ def main(directory, args):
     dataset = Dataset(args)
 
     model = Model(dataset, args)
+    print(sum(p.numel() for p in model.parameters() if p.requires_grad), flush=True)
+    exit()
     optimizer = torch.optim.AdamW(model.get_params_for_optimizer(args), betas=(0.9, args.beta_2))
     scheduler = multi_scheduler_wrapper(optimizer, args, len(dataset.train))
     autoclip = AutoClip([p for name, p in model.named_parameters() if "loss_weights" not in name])
@@ -84,7 +86,6 @@ def main(directory, args):
         model.train()
         log.train(len_dataset=dataset.train_size)
 
-        i = 0
         model.zero_grad()
 
         for i, batch in enumerate(dataset.train):
@@ -145,7 +146,7 @@ def main(directory, args):
     #
     # TEST PREDICTION
     #
-    test_path = f"test_predictions/{args.graph_mode}/{args.framework}_{args.language}_{args.seed}"
+    test_path = f"test_predictions/{args.graph_mode}/{args.framework}_{args.language}_{args.seed}_frozen"
     if not os.path.exists(test_path):
         os.mkdir(test_path)
     predict(model, dataset.test, args.test_data, None, args, None, test_path, device, mode="test")
