@@ -49,8 +49,10 @@ class SequentialParser(AbstractParser):
                     del sentence["nodes"][i]
             sentence["edges"] = []
 
-        for node, _ in utils.node_generator(self.data):
-            node["properties"] = {"dummy": 0}
+        for node, sentence in utils.node_generator(self.data):
+            if "Intensity" not in node["properties"] or node["properties"]["Intensity"] is None:
+                node["properties"] = {"Intensity": "<NONE>"}
+                print("Missing property ", sentence["id"])
             self.node_counter += 1
 
         utils.create_bert_tokens(self.data, args.encoder)

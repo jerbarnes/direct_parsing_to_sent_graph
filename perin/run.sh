@@ -2,7 +2,7 @@
 
 #SBATCH --job-name=SENTIMENT_PERIN
 #SBATCH --account=nn9851k
-#SBATCH --time=00-18:00:00
+#SBATCH --time=02-00:00:00
 #OFF_SBATCH --qos=devel
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
@@ -28,7 +28,7 @@ module load nlpl-nltk/3.5-gomkl-2019b-Python-3.7.4
 #NVIDIA_MONITOR_PID=$!  # Capture PID of monitoring process
 
 TRANSFORMERS_OFFLINE=1 WANDB_MODE=offline python3 train.py --log_wandb --config "$1"
-#TRANSFORMERS_OFFLINE=1 WANDB_MODE=offline python3 optuna_train.py --log_wandb --config config/base_darmstadt.yaml
+#TRANSFORMERS_OFFLINE=1 WANDB_MODE=offline python3 optuna_train.py --log_wandb --config config/seq_norec_frozen.yaml
 
 # TRANSFORMERS_OFFLINE=1 WANDB_MODE=offline python3 train.py --config config/base_opener_en.yaml --seed 1234
 # TRANSFORMERS_OFFLINE=1 WANDB_MODE=offline python3 train.py --config config/base_opener_en.yaml --seed 5678

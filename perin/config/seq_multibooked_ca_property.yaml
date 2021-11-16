@@ -1,12 +1,12 @@
-
-framework: norec
-language: "no"
+framework: multibooked
+language: ca
 graph_mode: sequential
 
 encoder: /cluster/projects/nn9851k/models/xlm-roberta-base
 epochs: 200
 freeze_bert: false
-n_layers: 3
+predict_intensity: true
+n_layers: 0
 query_length: 1
 balance_loss_weights: false
 grad_norm_lr: 3.0e-5
@@ -22,10 +22,9 @@ focal: true
 hidden_size_edge_presence: 256
 hidden_size_anchor: 256
 dropout_anchor: 0.4
-dropout_edge_presence: 0.9
+dropout_edge_presence: 0.95
 dropout_label: 0.85
-dropout_property: 0.9
-dropout_transformer: 0.25
 batch_size: 16
+dropout_transformer: 0.25
 beta_2: 0.98
 layerwise_lr_decay: 0.9

@@ -23,7 +23,7 @@ def read(fp, text=None, node_centric=False):
 
             for opinion in native["opinions"]:
                 expression = opinion["Polar_expression"]
-                properties, values = list(), list()
+                properties, values = ["Intensity"], [opinion["Intensity"]]
 
                 if node_centric:
                     expression = graph.add_node(
@@ -112,6 +112,9 @@ def write_node_centric(graph, input):
             "Polar_expression": [*get_text_span(node, input)],
             "Polarity": node.label,
         }
+        if node.properties is not None and len(node.properties) > 0:
+            for key, value in zip(node.properties, node.values):
+                opinions[node.id][key] = value
 
     # add sources & targets
     for edge in graph.edges:
