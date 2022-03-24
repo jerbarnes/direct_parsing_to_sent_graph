@@ -1,8 +1,7 @@
 import torch
-import torchtext
-from torchtext.data import RawField
+from data.field.mini_torchtext.field import RawField
+from data.field.mini_torchtext.vocab import Vocab
 from collections import Counter
-from torchtext.vocab import Vocab
 
 
 class LabelField(RawField):

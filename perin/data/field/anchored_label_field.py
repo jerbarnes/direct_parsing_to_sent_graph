@@ -1,8 +1,5 @@
 import torch
-from torchtext.data import RawField
-from torchtext.vocab import Vocab
-from collections import Counter
-import types
+from data.field.mini_torchtext.field import RawField
 
 
 class AnchoredLabelField(RawField):

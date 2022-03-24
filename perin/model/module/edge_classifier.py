@@ -1,18 +1,10 @@
 #!/usr/bin/env python3
-# conding=utf-8
-#
-# Copyright 2020 Institute of Formal and Applied Linguistics, Faculty of
-# Mathematics and Physics, Charles University, Czech Republic.
-#
-# This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# coding=utf-8
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from model.module.biaffine import Biaffine
-from model.module.grad_scaler import scale_grad
 
 
 class EdgeClassifier(nn.Module):
@@ -39,13 +31,13 @@ class EdgeClassifier(nn.Module):
                 args.hidden_size, args.hidden_size_edge_label, n_labels, args.dropout_edge_label, bias_init=label_init
             )
 
-    def forward(self, x, loss_weights):
+    def forward(self, x):
         presence, label = None, None
 
         if self.presence:
-            presence = self.edge_presence(scale_grad(x, loss_weights["edge presence"])).squeeze(-1)  # shape: (B, T, T)
+            presence = self.edge_presence(x).squeeze(-1)  # shape: (B, T, T)
         if self.label:
-            label = self.edge_label(scale_grad(x, loss_weights["edge label"]))  # shape: (B, T, T, O_1)
+            label = self.edge_label(x)  # shape: (B, T, T, O_1)
 
         return presence, label
 

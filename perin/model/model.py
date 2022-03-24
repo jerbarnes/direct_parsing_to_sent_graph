@@ -1,12 +1,5 @@
 #!/usr/bin/env python3
-# conding=utf-8
-#
-# Copyright 2020 Institute of Formal and Applied Linguistics, Faculty of
-# Mathematics and Physics, Charles University, Czech Republic.
-#
-# This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# coding=utf-8
 
 import torch
 import torch.nn as nn
@@ -18,7 +11,6 @@ from model.head.node_centric_head import NodeCentricHead
 from model.head.labeled_edge_head import LabeledEdgeHead
 from model.head.sequential_head import SequentialHead
 from utility.utils import create_padding_mask
-from data.batch import Batch
 
 
 class Model(nn.Module):
@@ -38,7 +30,6 @@ class Model(nn.Module):
             self.head = LabeledEdgeHead(dataset, args, initialize)
 
         self.query_length = args.query_length
-        self.label_smoothing = args.label_smoothing
         self.dataset = dataset
         self.args = args
 
@@ -54,11 +45,12 @@ class Model(nn.Module):
         encoder_output, decoder_input = self.encoder(batch["input"], batch["char_form_input"], batch["input_scatter"], input_len)
 
         decoder_output = self.decoder(decoder_input, encoder_output, decoder_mask, encoder_mask)
-        decoder_output.requires_grad_(True)
+        # TODO: decoder_output.requires_grad_(True)
 
         if inference:
             return self.head.predict(encoder_output, decoder_output, encoder_mask, decoder_mask, batch)
-        return self.head(encoder_output, decoder_output, encoder_mask, decoder_mask, batch)
+        else:
+            return self.head(encoder_output, decoder_output, encoder_mask, decoder_mask, batch)
 
     def get_params_for_optimizer(self, args):
         encoder_decay, encoder_no_decay = self.get_encoder_parameters(args.n_encoder_layers)
@@ -74,8 +66,8 @@ class Model(nn.Module):
 
     def get_decoder_parameters(self):
         no_decay = ["bias", "LayerNorm.weight", "_norm.weight"]
-        decay_params = (p for name, p in self.named_parameters() if not any(nd in name for nd in no_decay) and not name.startswith("encoder.bert") and "loss_weights" not in name and p.requires_grad)
-        no_decay_params = (p for name, p in self.named_parameters() if any(nd in name for nd in no_decay) and not name.startswith("encoder.bert") and "loss_weights" not in name and p.requires_grad)
+        decay_params = (p for name, p in self.named_parameters() if not any(nd in name for nd in no_decay) and not name.startswith("encoder.bert") and p.requires_grad)
+        no_decay_params = (p for name, p in self.named_parameters() if any(nd in name for nd in no_decay) and not name.startswith("encoder.bert") and p.requires_grad)
 
         return decay_params, no_decay_params
 

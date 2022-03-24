@@ -1,12 +1,5 @@
 #!/usr/bin/env python3
-# conding=utf-8
-#
-# Copyright 2020 Institute of Formal and Applied Linguistics, Faculty of
-# Mathematics and Physics, Charles University, Czech Republic.
-#
-# This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# coding=utf-8
 
 import torch
 import torch.nn.functional as F
@@ -24,23 +17,6 @@ def masked_sum(loss, mask, label_weight=1, eps=1e-8, reduction=True):
     return loss
 
 
-def multi_label_cross_entropy(probs, target, mask, focal=False, label_weight=None, reduction=True):
-    if focal:
-        focal_coeff = (probs * target).sum(dim=-1)
-        focal_coeff = (1.0 - focal_coeff) ** 2
-    else:
-        focal_coeff = 1.0
-
-    logits = torch.log(probs + 1e-8)
-    loss = -focal_coeff * (logits * target).sum(dim=-1)
-
-    if label_weight is not None:
-        loss = loss * label_weight
-        return masked_sum(loss, mask, label_weight=label_weight, reduction=reduction)
-    else:
-        return masked_sum(loss, mask, reduction=reduction)
-
-
 def cross_entropy(log_prob, target, mask, focal=False, label_weight=None, reduction=True):
     target = target.unsqueeze(-1)
     if focal:
@@ -50,30 +26,6 @@ def cross_entropy(log_prob, target, mask, focal=False, label_weight=None, reduct
         focal_coeff = 1.0
 
     loss = -focal_coeff * log_prob.gather(-1, target).squeeze(-1)
-
-    if label_weight is not None:
-        loss = loss * label_weight
-        return masked_sum(loss, mask, label_weight=label_weight, reduction=reduction)
-    else:
-        return masked_sum(loss, mask, reduction=reduction)
-
-
-def smooth_cross_entropy(log_prob, target, mask, focal=False, label_weight=None, reduction=True, smoothing=0.0):
-    if smoothing == 0.0:
-        return cross_entropy(log_prob, target, mask, focal=focal, label_weight=label_weight, reduction=reduction)
-
-    target = target.unsqueeze(-1)
-    n_class = log_prob.size(-1)
-    gold_one_hot = torch.full_like(log_prob, fill_value=smoothing / (n_class - 1))
-    gold_one_hot.scatter_(dim=-1, index=target, value=1.0 - smoothing)
-
-    if focal:
-        focal_coeff = (log_prob.exp() * gold_one_hot).sqrt().sum(-1)
-        focal_coeff = (1.0 - focal_coeff) ** 2
-    else:
-        focal_coeff = 1.0
-
-    loss = focal_coeff * F.kl_div(input=log_prob, target=gold_one_hot, reduction='none').sum(-1)
 
     if label_weight is not None:
         loss = loss * label_weight

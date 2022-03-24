@@ -1,18 +1,11 @@
 #!/usr/bin/env python3
-# conding=utf-8
-#
-# Copyright 2020 Institute of Formal and Applied Linguistics, Faculty of
-# Mathematics and Physics, Charles University, Czech Republic.
-#
-# This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# coding=utf-8
 
 import torch
-import torchtext
+from data.field.mini_torchtext.field import NestedField as TorchTextNestedField
 
 
-class NestedField(torchtext.data.NestedField):
+class NestedField(TorchTextNestedField):
     def pad(self, example):
         self.nesting_field.include_lengths = self.include_lengths
         if not self.include_lengths:
@@ -51,7 +44,7 @@ class NestedField(torchtext.data.NestedField):
 
         # just build vocab and does not load vector
         self.nesting_field.build_vocab(*flattened, **kwargs)
-        super(torchtext.data.NestedField, self).build_vocab()
+        super(TorchTextNestedField, self).build_vocab()
         self.vocab.extend(self.nesting_field.vocab)
         self.vocab.freqs = self.nesting_field.vocab.freqs.copy()
         self.nesting_field.vocab = self.vocab

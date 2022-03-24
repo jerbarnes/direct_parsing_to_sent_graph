@@ -1,29 +1,19 @@
 #!/usr/bin/env python3
-# conding=utf-8
-#
-# Copyright 2020 Institute of Formal and Applied Linguistics, Faculty of
-# Mathematics and Physics, Charles University, Czech Republic.
-#
-# This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# coding=utf-8
 
 import torch
 import torch.nn as nn
 
 from model.head.abstract_head import AbstractHead
-from model.module.grad_scaler import scale_grad
 from data.parser.to_mrp.labeled_edge_parser import LabeledEdgeParser
 from utility.cross_entropy import binary_cross_entropy
 from utility.hungarian_matching import match_label
-from utility.utils import create_padding_mask
 
 
 class LabeledEdgeHead(AbstractHead):
     def __init__(self, dataset, args, initialize):
         config = {
             "label": True,
-            "property": False,
             "edge presence": True,
             "edge label": True,
             "anchor": True,
@@ -36,9 +26,6 @@ class LabeledEdgeHead(AbstractHead):
         self.parser = LabeledEdgeParser(dataset)
 
     def init_label_classifier(self, dataset, args, config, initialize: bool):
-        self.preference_weights["label"] = 1.0 
-        self.loss_0["label"] = torch.distributions.categorical.Categorical(dataset.label_freqs).entropy()  # / 2
-
         classifier = nn.Sequential(
             nn.Dropout(args.dropout_label),
             nn.Linear(args.hidden_size, 1, bias=True)
@@ -49,14 +36,13 @@ class LabeledEdgeHead(AbstractHead):
 
         return classifier
 
-    def forward_label(self, decoder_output, decoder_lens):
-        decoder_output = scale_grad(decoder_output, self.loss_weights["label"])
+    def forward_label(self, decoder_output):
         return self.label_classifier(decoder_output)
 
     def forward_edge(self, decoder_output):
         top_node = self.top_node.expand(decoder_output.size(0), -1, -1)
         decoder_output = torch.cat([top_node, decoder_output], dim=1)
-        return self.edge_classifier(decoder_output, self.loss_weights)
+        return self.edge_classifier(decoder_output)
 
     def loss_label(self, prediction, target, mask, matching):
         prediction = prediction["label"]

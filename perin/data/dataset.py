@@ -1,18 +1,9 @@
 #!/usr/bin/env python3
-# conding=utf-8
-#
-# Copyright 2020 Institute of Formal and Applied Linguistics, Faculty of
-# Mathematics and Physics, Charles University, Czech Republic.
-#
-# This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# coding=utf-8
 
 import pickle
 
 import torch
-import torchtext
-from random import Random
 
 from data.parser.from_mrp.node_centric_parser import NodeCentricParser
 from data.parser.from_mrp.labeled_edge_parser import LabeledEdgeParser
@@ -22,12 +13,12 @@ from data.parser.from_mrp.request_parser import RequestParser
 from data.field.edge_field import EdgeField
 from data.field.edge_label_field import EdgeLabelField
 from data.field.field import Field
+from data.field.mini_torchtext.field import Field as TorchTextField
 from data.field.label_field import LabelField
 from data.field.anchored_label_field import AnchoredLabelField
 from data.field.nested_field import NestedField
 from data.field.basic_field import BasicField
 from data.field.bert_field import BertField
-from data.field.property_field import PropertyField
 from data.field.anchor_field import AnchorField
 from data.batch import Batch
 
@@ -51,12 +42,11 @@ class Dataset:
         self.scatter_field = BasicField()
         self.every_word_input_field = Field(lower=True, init_token=self.sos, eos_token=self.eos, batch_first=True, include_lengths=True)
 
-        char_form_nesting = torchtext.data.Field(tokenize=char_tokenize, init_token=self.sos, eos_token=self.eos, batch_first=True)
+        char_form_nesting = TorchTextField(tokenize=char_tokenize, init_token=self.sos, eos_token=self.eos, batch_first=True)
         self.char_form_field = NestedField(char_form_nesting, include_lengths=True)
 
         self.label_field = LabelField(preprocessing=lambda nodes: [n["label"] for n in nodes])
         self.anchored_label_field = AnchoredLabelField()
-        self.property_field = PropertyField(preprocessing=lambda nodes: [n["properties"] for n in nodes])
 
         self.id_field = Field(batch_first=True, tokenize=lambda x: [x])
         self.edge_presence_field = EdgeField()
@@ -74,15 +64,11 @@ class Dataset:
         print(text, flush=True)
 
     def load_state_dict(self, args, d):
-        self.property_keys = d["property keys"]
-        self.property_field.vocabs = pickle.loads(d["property vocabs"])
         for key, value in d["vocabs"].items():
             getattr(self, key).vocab = pickle.loads(value)
 
     def state_dict(self):
         return {
-            "property vocabs": pickle.dumps(self.property_field.vocabs),
-            "property keys": self.property_keys,
             "vocabs": {key: pickle.dumps(value.vocab) for key, value in self.__dict__.items() if hasattr(value, "vocab")}
         }
 
@@ -116,10 +102,7 @@ class Dataset:
                 "input": [("every_input", self.every_word_input_field), ("char_form_input", self.char_form_field)],
                 "bert input": ("input", self.bert_input_field),
                 "to scatter": ("input_scatter", self.scatter_field),
-                "nodes": [
-                    ("labels", self.label_field),
-                    ("properties", self.property_field),
-                ],
+                "nodes": ("labels", self.label_field),
                 "anchored labels": ("anchored_labels", self.anchored_label_field),
                 "edge presence": ("edge_presence", self.edge_presence_field),
                 "edge labels": ("edge_labels", self.edge_label_field),
@@ -138,10 +121,7 @@ class Dataset:
                 "input": [("every_input", self.every_word_input_field), ("char_form_input", self.char_form_field)],
                 "bert input": ("input", self.bert_input_field),
                 "to scatter": ("input_scatter", self.scatter_field),
-                "nodes": [
-                    ("labels", self.label_field),
-                    ("properties", self.property_field),
-                ],
+                "nodes": ("labels", self.label_field),
                 "anchored labels": ("anchored_labels", self.anchored_label_field),
                 "edge presence": ("edge_presence", self.edge_presence_field),
                 "edge labels": ("edge_labels", self.edge_label_field),
@@ -193,17 +173,12 @@ class Dataset:
         self.id_field.build_vocab(train, val, test, min_freq=1, specials=[])
         self.label_field.build_vocab(train)
         self.anchored_label_field.vocab = self.label_field.vocab
-        self.property_field.build_vocab(train)
         self.edge_label_field.build_vocab(train)
         print(list(self.edge_label_field.vocab.freqs.keys()), flush=True)
 
         self.char_form_vocab_size = len(self.char_form_field.vocab)
         self.create_label_freqs(args)
         self.create_edge_freqs(args)
-        self.create_property_freqs(args)
-
-        self.property_keys = self.property_field.keys
-        self.log(f"properties: {self.property_field.keys}")
 
         self.log(f"Edge frequency: {self.edge_presence_freq*100:.2f} %")
         self.log(f"{len(self.label_field.vocab)} words in the label vocabulary")
@@ -253,10 +228,9 @@ class Dataset:
     def create_label_freqs(self, args):
         n_rules = len(self.label_field.vocab)
         blank_count = (args.query_length * self.token_count - self.node_count)
-        blank_p = blank_count * (1.0 - args.label_smoothing) + self.node_count * args.label_smoothing / n_rules
-        non_blank_p = blank_count * args.label_smoothing / n_rules
+        blank_p = blank_count / n_rules
         label_counts = [blank_p] + [
-            self.label_field.vocab.freqs[self.label_field.vocab.itos[i]] + non_blank_p
+            self.label_field.vocab.freqs[self.label_field.vocab.itos[i]]
             for i in range(n_rules)
         ]
         label_counts = torch.FloatTensor(label_counts)
@@ -270,9 +244,3 @@ class Dataset:
         edge_counter = torch.FloatTensor(edge_counter)
         self.edge_label_freqs = edge_counter / self.edge_count
         self.edge_presence_freq = self.edge_count / (self.edge_count + self.no_edge_count)
-
-    def create_property_freqs(self, args):
-        property_counter = {
-            key: [vocab.freqs[vocab.itos[i]] for i in range(len(vocab))] for key, vocab in self.property_field.vocabs.items()
-        }
-        self.property_freqs = {key: torch.FloatTensor(c) / self.node_count for key, c in property_counter.items()}

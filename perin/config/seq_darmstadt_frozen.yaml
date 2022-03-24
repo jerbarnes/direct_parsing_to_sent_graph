@@ -8,13 +8,10 @@ freeze_bert: true
 n_layers: 3
 query_length: 1
 lr_decay_multiplier: 100
-balance_loss_weights: false
-grad_norm_lr: 3.0e-5
 decoder_learning_rate: 1.0e-4
 encoder_learning_rate: 6.0e-6            # initial encoder learning rate
 lr_decay_multiplier: 100
 encoder_weight_decay: 0.1
-label_smoothing: 0.0
 encoder_delay_steps: 500
 warmup_steps: 1000
 char_embedding: true

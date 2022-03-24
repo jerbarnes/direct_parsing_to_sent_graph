@@ -1,12 +1,5 @@
 #!/usr/bin/env python3
-# conding=utf-8
-#
-# Copyright 2020 Institute of Formal and Applied Linguistics, Faculty of
-# Mathematics and Physics, Charles University, Czech Republic.
-#
-# This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# coding=utf-8
 
 import argparse
 import os
@@ -25,8 +18,6 @@ from utility.autoclip import AutoClip
 from data.batch import Batch
 from config.params import Params
 from utility.predict import predict
-from utility.adamw import AdamW
-from utility.loss_weight_learner import LossWeightLearner
 
 
 def parse_arguments():
@@ -62,13 +53,9 @@ def main(directory, args):
     dataset = Dataset(args)
 
     model = Model(dataset, args)
-    print(sum(p.numel() for p in model.parameters() if p.requires_grad), flush=True)
-    exit()
     optimizer = torch.optim.AdamW(model.get_params_for_optimizer(args), betas=(0.9, args.beta_2))
     scheduler = multi_scheduler_wrapper(optimizer, args, len(dataset.train))
-    autoclip = AutoClip([p for name, p in model.named_parameters() if "loss_weights" not in name])
-    if args.balance_loss_weights:
-        loss_weight_learner = LossWeightLearner(args, model, len(dataset.train))
+    autoclip = AutoClip(model.parameters())
 
     print(f"\nCONFIG:\n{args.state_dict()}")
     print(f"\n\nMODEL: {model}\n", flush=True)
@@ -90,25 +77,19 @@ def main(directory, args):
 
         for i, batch in enumerate(dataset.train):
             batch = Batch.to(batch, device)
-            total_loss, losses, stats = model(batch)
-            stats.update(model.head.loss_weights_dict())
-
-            if args.balance_loss_weights:
-                loss_weight_learner.compute_grad(losses, epoch)
+            total_loss, stats = model(batch)
             total_loss.backward()
 
             if (i + 1) % args.accumulation_steps == 0:
                 grad_norm = autoclip()
 
-                if args.balance_loss_weights:
-                    loss_weight_learner.step(epoch)
                 scheduler(epoch)
                 optimizer.step()
                 model.zero_grad()
 
                 with torch.no_grad():
                     batch_size = batch["every_input"][0].size(0) * args.accumulation_steps
-                    log(batch_size, stats, grad_norm=0.0, learning_rates=scheduler.lr() + [loss_weight_learner.scheduler.lr() if args.balance_loss_weights else 0.0])
+                    log(batch_size, stats, grad_norm=0.0, learning_rates=scheduler.lr())
 
         if epoch < args.epochs - 5 and epoch % args.validate_each != (args.validate_each - 1):
             continue
@@ -119,22 +100,22 @@ def main(directory, args):
         model.eval()
         log.eval(len_dataset=dataset.val_size)
 
-        # with torch.no_grad():
-        #     for batch in dataset.val:
-        #         try:
-        #             _, _, stats = model(Batch.to(batch, device))
+        with torch.no_grad():
+            for batch in dataset.val:
+                try:
+                    _, stats = model(Batch.to(batch, device))
 
-        #             batch_size = batch["every_input"][0].size(0)
-        #             log(batch_size, stats, args.frameworks)
-        #         except RuntimeError as e:
-        #             if 'out of memory' in str(e):
-        #                 print('| WARNING: ran out of memory, skipping batch')
-        #                 if hasattr(torch.cuda, 'empty_cache'):
-        #                     torch.cuda.empty_cache()
-        #             else:
-        #                 raise e
+                    batch_size = batch["every_input"][0].size(0)
+                    log(batch_size, stats, args.frameworks)
+                except RuntimeError as e:
+                    if 'out of memory' in str(e):
+                        print('| WARNING: ran out of memory, skipping batch')
+                        if hasattr(torch.cuda, 'empty_cache'):
+                            torch.cuda.empty_cache()
+                    else:
+                        raise e
 
-        # log.flush()
+        log.flush()
 
         #
         # VALIDATION MRP-SCORES
@@ -146,7 +127,7 @@ def main(directory, args):
     #
     # TEST PREDICTION
     #
-    test_path = f"test_predictions/{args.graph_mode}/{args.framework}_{args.language}_{args.seed}_frozen"
+    test_path = f"test_predictions/{args.graph_mode}/{args.framework}_{args.language}_{args.seed}"
     if not os.path.exists(test_path):
         os.mkdir(test_path)
     predict(model, dataset.test, args.test_data, None, args, None, test_path, device, mode="test")

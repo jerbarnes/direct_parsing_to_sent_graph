@@ -1,25 +1,11 @@
 #!/usr/bin/env python3
-# conding=utf-8
-#
-# Copyright 2020 Institute of Formal and Applied Linguistics, Faculty of
-# Mathematics and Physics, Charles University, Czech Republic.
-#
-# This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# coding=utf-8
 
 import json
-import math
-from collections import Counter
-from functools import reduce
-import operator
-import multiprocessing as mp
-import time
 from transformers import AutoTokenizer
 
 from utility.tokenizer import Tokenizer
 from utility.bert_tokenizer import bert_tokenizer
-from utility.greedy_hitman import greedy_hitman
 
 import os
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
@@ -34,13 +20,6 @@ def load_dataset(path):
 
             if "nodes" not in sentence:
                 sentence["nodes"] = []
-
-            for node in sentence["nodes"]:
-                if "properties" in node:
-                    node["properties"] = {prop: node["values"][prop_i] for prop_i, prop in enumerate(node["properties"])}
-                    del node["values"]
-                else:
-                    node["properties"] = {}
 
             if "edges" not in sentence:
                 sentence["edges"] = []
@@ -80,28 +59,6 @@ def create_token_anchors(sentence):
 
         sentence["token anchors"].append({"from": start, "to": end})
         offset = end
-
-
-def normalize_properties(data):
-    for sentence in data.values():
-        properties = []
-        node_id = len(sentence["nodes"])
-        for node in sentence["nodes"]:
-            for relation, value in node["properties"].items():
-                nodedized = {
-                    "id": node_id,
-                    "label": value,
-                    "property": True,
-                }
-                if "anchors" in node:
-                    nodedized["anchors"] = node["anchors"]
-                properties.append(nodedized)
-                sentence["edges"].append({"source": node["id"], "target": node_id, "label": relation, "property": True})
-
-                node_id += 1
-
-            del node["properties"]
-        sentence["nodes"] += properties
 
 
 def node_generator(data):

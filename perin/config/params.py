@@ -1,5 +1,4 @@
 import yaml
-import copy
 
 
 class Params:
@@ -7,7 +6,6 @@ class Params:
         self.graph_mode = "sequential"               # possibilities: {sequential, node-centric, edge-labeled}
         self.accumulation_steps = 1                  # number of gradient accumulation steps for achieving a bigger batch_size
         self.activation = "relu"                     # transformer (decoder) activation function, supported values: {'relu', 'gelu', 'sigmoid', 'mish'}
-        self.balance_loss_weights = True             # use weight loss balancing (GradNorm)
         self.predict_intensity = False
         self.batch_size = 32                         # batch size (further divided into multiple GPUs)
         self.beta_2 = 0.98                           # beta 2 parameter for Adam(W) optimizer
@@ -21,7 +19,6 @@ class Params:
         self.dropout_edge_label = 0.5                # dropout at the last layer of edge label classifier
         self.dropout_edge_presence = 0.5             # dropout at the last layer of edge presence classifier
         self.dropout_label = 0.5                     # dropout at the last layer of label classifier
-        self.dropout_property = 0.7                  # dropout at the last layer of property classifier
         self.dropout_transformer = 0.5               # dropout for the transformer layers (decoder)
         self.dropout_transformer_attention = 0.1     # dropout for the transformer's attention (decoder)
         self.dropout_word = 0.1                      # probability of dropping out a whole word from the encoder (in favour of char embedding)
@@ -34,19 +31,14 @@ class Params:
         self.epochs = 100                            # number of epochs for train
         self.focal = True                            # use focal loss for the label prediction
         self.freeze_bert = False                     # use focal loss for the label prediction
-        self.grad_norm_alpha = 1.5                   # grad-norm sensitivity
-        self.grad_norm_lr = 1e-3                     # learning rate for the grad-norm optimizer
         self.group_ops = False                       # group 'opN' edge labels into one
         self.hidden_size_ff = 4 * 768                # hidden size of the transformer feed-forward submodule
         self.hidden_size_anchor = 128                # hidden size anchor biaffine layer
         self.hidden_size_edge_label = 256            # hidden size for edge label biaffine layer
         self.hidden_size_edge_presence = 512         # hidden size for edge label biaffine layer
-        self.label_smoothing = 0.1                   # amount of label smoothing applied for label classification
         self.layerwise_lr_decay = 1.0                # layerwise decay of learning rate in the encoder
         self.n_attention_heads = 8                   # number of attention heads in the decoding transformer
         self.n_layers = 3                            # number of layers in the decoder
-        self.n_mixture_components = 15               # number of components in the mixture of softmaxes for the label output
-        self.normalize = True                        # normalize inverted edge directions and labels
         self.query_length = 4                        # number of queries genereted for each word on the input
         self.pre_norm = True                         # use pre-normalized version of the transformer (as in Transformers without Tears)
         self.warmup_steps = 6000                     # number of the warm-up steps for the inverse_sqrt scheduler

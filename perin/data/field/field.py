@@ -1,10 +1,10 @@
 import torch
-import torchtext
+from data.field.mini_torchtext.field import Field as TorchTextField
 from collections import Counter, OrderedDict
 
 
 # small change of vocab building to correspond to our version of Dataset
-class Field(torchtext.data.Field):
+class Field(TorchTextField):
     def build_vocab(self, *args, **kwargs):
         counter = Counter()
         sources = []

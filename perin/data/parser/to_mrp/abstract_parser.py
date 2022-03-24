@@ -1,12 +1,5 @@
 #!/usr/bin/env python3
-# conding=utf-8
-#
-# Copyright 2020 Institute of Formal and Applied Linguistics, Faculty of
-# Mathematics and Physics, Charles University, Czech Republic.
-#
-# This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+# coding=utf-8
 
 class AbstractParser:
     def __init__(self, dataset):
@@ -20,36 +13,6 @@ class AbstractParser:
 
     def label_to_str(self, label, anchors, prediction):
         return self.dataset.label_field.vocab.itos[label - 1]
-
-    def create_properties(self, prediction, nodes):
-        N = len(nodes)
-        properties_p = prediction["properties"][:N]
-
-        threshold = max(0.5, properties_p.min().item())  # make sure there's at least one proper node
-        properties = (properties_p > threshold).nonzero(as_tuple=False).squeeze(-1)
-        non_properties = (properties_p <= threshold).nonzero(as_tuple=False).squeeze(-1)
-
-        for i in properties:
-            edge_probs = prediction["edge presence"][:N, i].clone()
-            edge_probs[properties] = 0.0
-
-            parent_i = edge_probs.argmax()
-            parent = nodes[parent_i]
-            if "properties" not in parent:
-                parent["properties"], parent["values"] = [], []
-            parent["properties"].append(self.get_edge_label(prediction, parent_i, i))
-            parent["values"].append(nodes[i]["label"])
-
-        nodes = [nodes[i] for i in non_properties]
-        for i in range(len(nodes)):
-            nodes[i]["id"] = i
-
-        prediction["edge presence"] = prediction["edge presence"][non_properties, :][:, non_properties]
-        prediction["edge labels"] = prediction["edge labels"][non_properties, :][:, non_properties]
-        if "anchors" in prediction and prediction["anchors"] is not None:
-            prediction["anchors"] = [prediction["anchors"][i] for i in non_properties]
-
-        return nodes
 
     def create_edges(self, prediction, nodes):
         N = len(nodes)
