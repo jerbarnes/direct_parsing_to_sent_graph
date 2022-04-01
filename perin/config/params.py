@@ -79,7 +79,7 @@ class Params:
 
     def load(self, args):
         with open(args.config, "r", encoding="utf-8") as f:
-            params = yaml.load(f)
+            params = yaml.safe_load(f)
             self.load_state_dict(params)
         self.init_data_paths()
 
