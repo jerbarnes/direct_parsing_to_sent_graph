@@ -123,6 +123,12 @@ def main(directory, args):
     os.makedirs(f"{directory}/test_predictions", exist_ok=True)
     predict(model, dataset.test, args.test_data, None, args, None, f"{directory}/test_predictions", device, mode="test")
 
+    torch.save({
+        "model": model.state_dict(),
+        "vocabulary": dataset.state_dict(),
+        "params": args.state_dict()
+    }, f"{directory}/checkpoint.bin")
+
 
 if __name__ == "__main__":
     args = parse_arguments()
