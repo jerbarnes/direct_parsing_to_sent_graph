@@ -3,7 +3,6 @@
 #SBATCH --job-name=SENTIMENT_PERIN
 #SBATCH --account=nn9851k
 #SBATCH --time=02-00:00:00
-#OFF_SBATCH --qos=devel
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=2
@@ -23,17 +22,4 @@ module load nlpl-scipy-ecosystem/2021.01-gomkl-2019b-Python-3.7.4
 module load sentencepiece/0.1.94-gomkl-2019b-Python-3.7.4
 module load nlpl-nltk/3.5-gomkl-2019b-Python-3.7.4
 
-#nvidia-smi --query-gpu=timestamp,utilization.gpu,utilization.memory \
-#	--format=csv --loop=1 > "gpu_util-$SLURM_JOB_ID.csv" &
-#NVIDIA_MONITOR_PID=$!  # Capture PID of monitoring process
-
 TRANSFORMERS_OFFLINE=1 WANDB_MODE=offline python3 train.py --log_wandb --config "$1"
-#TRANSFORMERS_OFFLINE=1 WANDB_MODE=offline python3 optuna_train.py --log_wandb --config config/seq_norec_frozen.yaml
-
-# TRANSFORMERS_OFFLINE=1 WANDB_MODE=offline python3 train.py --config config/base_opener_en.yaml --seed 1234
-# TRANSFORMERS_OFFLINE=1 WANDB_MODE=offline python3 train.py --config config/base_opener_en.yaml --seed 5678
-# TRANSFORMERS_OFFLINE=1 WANDB_MODE=offline python3 train.py --config config/base_opener_en.yaml --seed 9101112
-# TRANSFORMERS_OFFLINE=1 WANDB_MODE=offline python3 train.py --config config/base_opener_en.yaml --seed 13141516
-# TRANSFORMERS_OFFLINE=1 WANDB_MODE=offline python3 train.py --config config/base_opener_en.yaml --seed 17181920
-
-#kill -SIGINT "$NVIDIA_MONITOR_PID"
