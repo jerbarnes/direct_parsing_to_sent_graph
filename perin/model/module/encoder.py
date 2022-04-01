@@ -9,6 +9,7 @@ import torch.nn.functional as F
 
 from transformers.models.bert import BertModel
 from transformers.models.xlm_roberta import XLMRobertaModel
+from transformers import RobertaConfig
 from model.module.char_embedding import CharEmbedding
 
 
@@ -32,7 +33,9 @@ class Encoder(nn.Module):
         self.width_factor = args.query_length
 
         if "roberta" in args.encoder.lower():
-            self.bert = XLMRobertaModel.from_pretrained(args.encoder, gradient_checkpointing=True, add_pooling_layer=False)
+            config = RobertaConfig.from_pretrained(args.encoder)
+            config.update({"gradient_checkpointing": True})
+            self.bert = XLMRobertaModel(config, add_pooling_layer=False)
             if args.encoder_freeze_embedding:
                 self.bert.embeddings.requires_grad_(False)
                 self.bert.embeddings.LayerNorm.requires_grad_(True)
