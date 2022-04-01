@@ -4,6 +4,7 @@
 import argparse
 import os
 import datetime
+from tqdm import tqdm
 
 import torch
 import torch.utils.data
@@ -23,11 +24,11 @@ from utility.predict import predict
 def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", type=str, default=None, help="path to config file")
-    parser.add_argument("--data_directory", type=str, default="/cluster/projects/nn9851k/davisamu/sent_graph_followup/data")
+    parser.add_argument("--output_directory", type=str, default="../outputs")
+    parser.add_argument("--data_directory", type=str, default="../data")
     parser.add_argument("--dist_backend", default="nccl", type=str)
     parser.add_argument("--dist_url", default="localhost", type=str)
-    parser.add_argument("--home_directory", type=str, default="/cluster/projects/nn9851k/davisamu/sent_graph_followup/data")
-    parser.add_argument("--name", default="no-query-tanh", type=str, help="name of this run.")
+    parser.add_argument("--name", default="test", type=str, help="name of this run.")
     parser.add_argument("--save_checkpoints", dest="save_checkpoints", action="store_true", default=False)
     parser.add_argument("--seed", dest="seed", type=int, default=17181920)
     parser.add_argument("--log_wandb", dest="log_wandb", action="store_true", default=False)
@@ -75,7 +76,7 @@ def main(directory, args):
 
         model.zero_grad()
 
-        for i, batch in enumerate(dataset.train):
+        for i, batch in tqdm(enumerate(dataset.train)):
             batch = Batch.to(batch, device)
             total_loss, stats = model(batch)
             total_loss.backward()
@@ -89,7 +90,7 @@ def main(directory, args):
 
                 with torch.no_grad():
                     batch_size = batch["every_input"][0].size(0) * args.accumulation_steps
-                    log(batch_size, stats, grad_norm=0.0, learning_rates=scheduler.lr())
+                    log(batch_size, stats, grad_norm=grad_norm, learning_rates=scheduler.lr())
 
         if epoch < args.epochs - 5 and epoch % args.validate_each != (args.validate_each - 1):
             continue
@@ -101,19 +102,11 @@ def main(directory, args):
         log.eval(len_dataset=dataset.val_size)
 
         with torch.no_grad():
-            for batch in dataset.val:
-                try:
-                    _, stats = model(Batch.to(batch, device))
+            for batch in tqdm(dataset.val):
+                _, stats = model(Batch.to(batch, device))
 
-                    batch_size = batch["every_input"][0].size(0)
-                    log(batch_size, stats, args.frameworks)
-                except RuntimeError as e:
-                    if 'out of memory' in str(e):
-                        print('| WARNING: ran out of memory, skipping batch')
-                        if hasattr(torch.cuda, 'empty_cache'):
-                            torch.cuda.empty_cache()
-                    else:
-                        raise e
+                batch_size = batch["every_input"][0].size(0)
+                log(batch_size, stats, args.frameworks)
 
         log.flush()
 
@@ -127,18 +120,15 @@ def main(directory, args):
     #
     # TEST PREDICTION
     #
-    test_path = f"test_predictions/{args.graph_mode}/{args.framework}_{args.language}_{args.seed}"
-    if not os.path.exists(test_path):
-        os.mkdir(test_path)
-    predict(model, dataset.test, args.test_data, None, args, None, test_path, device, mode="test")
+    os.makedirs(f"{directory}/test_predictions", exist_ok=True)
+    predict(model, dataset.test, args.test_data, None, args, None, f"{directory}/test_predictions", device, mode="test")
 
 
 if __name__ == "__main__":
     args = parse_arguments()
 
     timestamp = f"{datetime.datetime.today():%m-%d-%y_%H-%M-%S}"
-    directory = f"/cluster/home/davisamu/home/sent_graph_followup/perin/outputs/test_{args.framework}_{args.language}_{timestamp}"
-    os.mkdir(directory)
-    os.mkdir(f"{directory}/test_predictions")
+    directory = f"{args.output_directory}/{args.framework}_{args.language}_{timestamp}"
+    os.makedirs(directory, exist_ok=True)
 
     main(directory, args)
