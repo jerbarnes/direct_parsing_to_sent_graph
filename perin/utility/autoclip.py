@@ -19,12 +19,12 @@ class AutoClip:
         self._add_to_history(self.parameters)
 
         grad_norms = []
-        for i, history in enumerate(self.grad_history):
-            if self.parameters[i].grad is None or not self.parameters[i].grad.abs().sum().is_nonzero():
+        for parameter, history in zip(self.parameters, self.grad_history):
+            if parameter.grad is None or not parameter.grad.abs().sum().is_nonzero():
                 continue
 
             clip_value = self._get_percentile(history, self.percentile)
-            grad_norms.append(nn.utils.clip_grad_norm_(self.parameters[i], clip_value).item())
+            grad_norms.append(nn.utils.clip_grad_norm_(parameter, clip_value).item())
 
         return sum(grad_norms) / len(grad_norms)
 
