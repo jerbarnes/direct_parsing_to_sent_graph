@@ -48,7 +48,7 @@ class AbstractHead(nn.Module):
         decoder_lens = self.query_length * word_lens
         batch_size = every_input.size(0)
 
-        label_pred = self.forward_label(decoder_output, decoder_lens)
+        label_pred = self.forward_label(decoder_output)
         anchor_pred = self.forward_anchor(decoder_output, encoder_output, encoder_mask, mode="anchor")  # shape: (B, T_l, T_w)
         source_anchor_pred = self.forward_anchor(decoder_output, encoder_output, encoder_mask, mode="source_anchor")  # shape: (B, T_l, T_w)
         target_anchor_pred = self.forward_anchor(decoder_output, encoder_output, encoder_mask, mode="target_anchor")  # shape: (B, T_l, T_w)
@@ -134,7 +134,7 @@ class AbstractHead(nn.Module):
         losses.update(self.loss_edge_label(output, batch, edge_label_mask.unsqueeze(-1)))
 
         stats = {f"{key}": value.detach().cpu().item() for key, value in losses.items()}
-        total_loss = sum(losses.values())
+        total_loss = sum(losses.values()) / len(losses)
 
         return total_loss, stats
 

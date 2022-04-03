@@ -228,8 +228,7 @@ class Dataset:
     def create_label_freqs(self, args):
         n_rules = len(self.label_field.vocab)
         blank_count = (args.query_length * self.token_count - self.node_count)
-        blank_p = blank_count / n_rules
-        label_counts = [blank_p] + [
+        label_counts = [blank_count] + [
             self.label_field.vocab.freqs[self.label_field.vocab.itos[i]]
             for i in range(n_rules)
         ]

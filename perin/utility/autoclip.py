@@ -7,8 +7,8 @@ import torch.nn as nn
 
 class AutoClip:
     def __init__(self, parameters, initial_clipping=0.1, percentile=50, history_len=1000):
-        self.parameters = parameters
-        self.grad_history = [torch.full([history_len], initial_clipping) for _ in parameters]
+        self.parameters = list(parameters)
+        self.grad_history = [torch.full([history_len], initial_clipping) for _ in self.parameters]
 
         self.index = 0
         self.history_len = history_len

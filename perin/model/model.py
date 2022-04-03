@@ -45,7 +45,6 @@ class Model(nn.Module):
         encoder_output, decoder_input = self.encoder(batch["input"], batch["char_form_input"], batch["input_scatter"], input_len)
 
         decoder_output = self.decoder(decoder_input, encoder_output, decoder_mask, encoder_mask)
-        # TODO: decoder_output.requires_grad_(True)
 
         if inference:
             return self.head.predict(encoder_output, decoder_output, encoder_mask, decoder_mask, batch)

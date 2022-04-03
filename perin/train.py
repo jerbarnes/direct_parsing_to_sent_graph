@@ -106,7 +106,7 @@ def main(directory, args):
                 _, stats = model(Batch.to(batch, device))
 
                 batch_size = batch["every_input"][0].size(0)
-                log(batch_size, stats, args.frameworks)
+                log(batch_size, stats)
 
         log.flush()
 
