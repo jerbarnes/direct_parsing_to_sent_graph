@@ -48,7 +48,7 @@ class Encoder(nn.Module):
             self.form_char_embedding = CharEmbedding(dataset.char_form_vocab_size, args.char_embedding_size, self.dim)
             self.word_dropout = WordDropout(args.dropout_word)
 
-        self.post_layer_norm = nn.LayerNorm(self.dim)
+        #self.post_layer_norm = nn.LayerNorm(self.dim)
         self.subword_attention = nn.Linear(self.dim, 1)
 
         if self.width_factor > 1:
@@ -78,16 +78,21 @@ class Encoder(nn.Module):
 
         scores = F.softmax(scores, dim=0)
         encoded = (scores * encoded).sum(0)  # shape: (B, T, H)
-        encoded = encoded.masked_fill(mask.unsqueeze(-1) == 0, 0.0)[:, 1:-1, :]
+        encoded = encoded.masked_fill(mask.unsqueeze(-1) == 0, 0.0)  # shape: (B, T, H)
 
-        subword_attention = self.subword_attention(encoded).sigmoid()  # shape: (B, T, 3)
-        encoded = encoded * subword_attention
+        subword_attention = self.subword_attention(encoded) / math.sqrt(self.dim)  # shape: (B, T, 1)
+        subword_attention = subword_attention.expand_as(to_scatter)  # shape: (B, T_subword, T_word)
+        subword_attention = subword_attention.masked_fill(~mask, float("-inf"))  # shape: (B, T_subword, T_word)
+        subword_attention = torch.softmax(subword_attention, dim=1)  # shape: (B, T_subword, T_word)
 
-        to_scatter = to_scatter.unsqueeze(-1).expand(-1, -1, self.dim)
-        encoder_output = torch.zeros(encoded.size(0), n_words + 1, self.dim, device=encoded.device)
-        encoder_output.scatter_add_(dim=1, index=to_scatter, src=encoded)  # shape: (B, n_words + 1, H)
-        encoder_output = encoder_output[:, :-1, :]
-        encoder_output = self.post_layer_norm(encoder_output)
+        encoder_output = torch.einsum("bsd,bsw->bwd", encoded, subword_attention)
+
+        # to_scatter = to_scatter.unsqueeze(-1).expand(-1, -1, self.dim)
+        # encoder_output = torch.zeros(encoded.size(0), n_words + 1, self.dim, device=encoded.device)
+        # encoder_output.scatter_add_(dim=1, index=to_scatter, src=encoded)  # shape: (B, n_words + 1, H)
+        # encoder_output = encoder_output[:, :-1, :]
+        # encoder_output = self.post_layer_norm(encoder_output)
+
         if self.use_char_embedding:
             form_char_embedding = self.form_char_embedding(form_chars[0], form_chars[1], form_chars[2])
             encoder_output = self.word_dropout(encoder_output) + form_char_embedding

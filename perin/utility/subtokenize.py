@@ -1,3 +1,6 @@
+import torch
+
+
 def normalize_abbreviations(text):
     text = text.replace(" n't ", "n't ")
     text = text.replace(" N'T ", "N'T ")
@@ -135,14 +138,12 @@ def subtokenize(tokens, tokenizer, compact_dashes=False):
 
     encoding = tokenizer(text, return_offsets_mapping=True)
 
-    # encoding = tokenizer.encode(text)
     spans = calculate_spans(spans, encoding["offset_mapping"][1:-1])
     subwords = encoding["input_ids"]
 
-    return subwords, spans
+    subword_mask = torch.zeros(len(subwords), len(spans), dtype=torch.bool)
+    for word_id, subword_ids in enumerate(spans):
+        for subword_id in subword_ids:
+            subword_mask[subword_id + 1, word_id] = True
 
-
-# tokens = ["(", "Chang", "Chiung", "-", "fang", "/", "tr", ".", "by", "David", "Mayer", ")", "I", "'m", "very", "nercous", "."]
-# tokens = [normalize(token) for token in tokens]
-# text, spans = detokenize(tokens)
-# print(text)
+    return subwords, subword_mask

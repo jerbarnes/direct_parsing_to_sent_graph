@@ -68,8 +68,7 @@ def create_bert_tokens(data, encoder: str):
     tokenizer = AutoTokenizer.from_pretrained(encoder, use_fast=True)
 
     for sentence in data.values():
-        sentence["bert input"], spans = subtokenize(sentence["input"], tokenizer)
-        sentence["to scatter"] = list(chain(*(len(span) * [i] for i, span in enumerate(spans))))
+        sentence["bert input"], sentence["to scatter"] = subtokenize(sentence["input"], tokenizer)
 
 
 def create_edges(sentence, label_f=None):
