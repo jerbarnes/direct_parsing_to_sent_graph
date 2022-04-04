@@ -15,8 +15,6 @@ class RequestParser(AbstractParser):
             example["input"] = example["input"].strip().split(' ')
             utils.create_token_anchors(example)
 
-        utils.tokenize(self.data, mode="aggressive")
-
         for example in self.data.values():
             example["token anchors"] = [[a["from"], a["to"]] for a in example["token anchors"]]
 

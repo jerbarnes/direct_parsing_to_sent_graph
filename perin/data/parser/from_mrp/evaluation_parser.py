@@ -9,7 +9,6 @@ class EvaluationParser(AbstractParser):
     def __init__(self, args, fields):
         path = args.test_data
         self.data = utils.load_dataset(path)
-        utils.tokenize(self.data, mode="space")
 
         for sentence in self.data.values():
             sentence["token anchors"] = [[a["from"], a["to"]] for a in sentence["token anchors"]]

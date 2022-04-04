@@ -1,5 +1,20 @@
-#!/usr/bin/env python3
-# coding=utf-8
+def normalize_abbreviations(text):
+    text = text.replace(" n't ", "n't ")
+    text = text.replace(" N'T ", "N'T ")
+    text = text.replace(" 'll ", "'ll ")
+    text = text.replace(" 'LL ", "'LL ")
+    text = text.replace(" 're ", "'re ")
+    text = text.replace(" 'RE ", "'RE ")
+    text = text.replace(" 've ", "'ve ")
+    text = text.replace(" 'VE ", "'VE ")
+    text = text.replace(" 'm ", "'m ")
+    text = text.replace(" 'M ", "'M ")
+    text = text.replace(" 's ", "'s ")
+    text = text.replace(" 'S ", "'S ")
+    text = text.replace(" 'd ", "'d ")
+    text = text.replace(" 'D ", "'D ")
+    return text
+
 
 def fix_quotes(text, quote_symbol='"'):
     n_quotes = text.count(f" {quote_symbol}") + text.count(f"{quote_symbol} ") - text.count(f" {quote_symbol} ")
@@ -42,7 +57,7 @@ def fix_quotes(text, quote_symbol='"'):
 
 def detokenize(tokens, compact_dashes=False):
     text = ' '.join(tokens)
-    # text = normalize_abbreviations(text)
+    text = normalize_abbreviations(text)
 
     if compact_dashes:
         text = text.replace(' - ', '-')
@@ -98,82 +113,36 @@ def detokenize(tokens, compact_dashes=False):
     return text, spans
 
 
-def bert_tokenizer(example, tokenizer, encoder):
-    if "xlm" in encoder.lower():
-        separator = '▁'
-    elif "roberta" in encoder.lower():
-        separator = 'Ġ'
-    elif "bert" in encoder.lower():
-        separator = '##'
-    else:
-        raise Exception(f"Unsupported tokenization for {encoder}")
+def calculate_spans(original_spans, encoding_offsets):
+    span_id = 0
+    subword_spans = [[] for _ in original_spans]
+    for i, (_, end) in enumerate(encoding_offsets):
+        subword_spans[span_id].append(i + 1)
 
-    sentence, _ = detokenize(example["input"])
-    original_tokens = [''.join([t.lstrip(separator).lower().strip() for t in tokenizer.tokenize(token)]) for token in example["input"]]
-    tokenized_tokens = [token.lstrip(separator).lower().strip() for token in tokenizer.tokenize(sentence)]
+        while original_spans[span_id][1] <= end:
+            span_id += 1
+            if span_id < len(original_spans) and end > original_spans[span_id][0]:
+                subword_spans[span_id].append(i + 1)
 
-    to_scatter, to_gather, to_delete = [], [], []
-    orig_i, orig_offset, chain_length = 0, 0, 0
-    unk_roll = False
+            if span_id == len(original_spans):
+                return subword_spans
 
-    for i, token in enumerate(tokenized_tokens):
-        chain_length += 1
-
-        while orig_i < len(original_tokens) - 1 and orig_offset >= len(original_tokens[orig_i]):
-            orig_i, orig_offset = orig_i + 1, 0
-            chain_length = 0
-
-        if token in ["<unk>", "[unk]", "[UNK]"]:
-            unk_roll = True
-            to_gather.append(i + 1)
-            to_scatter.append(orig_i)
-            if chain_length > 5:
-                to_delete.append(i)
-            continue
-
-        elif unk_roll:
-            found = False
-            for orig_i in range(orig_i, len(original_tokens)):
-                for orig_offset in range(len(original_tokens[orig_i])):
-                    original_token = original_tokens[orig_i][orig_offset:]
-                    if original_token.startswith(token) or token.startswith(original_token):
-                        chain_length = 0
-                        found = True
-                        break
-                if found:
-                    break
-
-        original_token = original_tokens[orig_i][orig_offset:]
-        unk_roll = False
-
-        if original_token.startswith(token):
-            to_gather.append(i + 1)
-            to_scatter.append(orig_i)
-            orig_offset += len(token)
-            if chain_length > 5:
-                to_delete.append(i)
-            continue
-
-        # print(f"BERT parsing error in sentence {example['id']}: {example['sentence']}")
-
-        unk_roll = True
-        to_gather.append(i + 1)
-        to_scatter.append(orig_i)
-
-    bert_input = tokenizer.encode(sentence, add_special_tokens=True)
-    to_gather, to_scatter, bert_input = reduce_bert_input(to_gather, to_scatter, bert_input, to_delete)
-
-    return to_scatter, bert_input
+    return subword_spans
 
 
-def reduce_bert_input(to_gather, to_scatter, bert_input, to_delete):
-    new_gather, new_scatter = [], []
-    offset = 0
-    for i in range(len(to_gather)):
-        if to_gather[i] - 1 in to_delete:
-            offset += 1
-        else:
-            new_gather.append(to_gather[i] - offset)
-            new_scatter.append(to_scatter[i])
-    bert_input = [w for i, w in enumerate(bert_input) if i - 1 not in to_delete]
-    return new_gather, new_scatter, bert_input
+def subtokenize(tokens, tokenizer, compact_dashes=False):
+    text, spans = detokenize(tokens, compact_dashes=compact_dashes)
+
+    encoding = tokenizer(text, return_offsets_mapping=True)
+
+    # encoding = tokenizer.encode(text)
+    spans = calculate_spans(spans, encoding["offset_mapping"][1:-1])
+    subwords = encoding["input_ids"]
+
+    return subwords, spans
+
+
+# tokens = ["(", "Chang", "Chiung", "-", "fang", "/", "tr", ".", "by", "David", "Mayer", ")", "I", "'m", "very", "nercous", "."]
+# tokens = [normalize(token) for token in tokens]
+# text, spans = detokenize(tokens)
+# print(text)

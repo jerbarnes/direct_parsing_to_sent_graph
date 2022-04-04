@@ -11,8 +11,6 @@ class SequentialParser(AbstractParser):
         path = args.training_data if part == "training" else args.validation_data
 
         self.data = utils.load_dataset(path)
-        utils.tokenize(self.data, mode="space")
-
         utils.anchor_ids_from_intervals(self.data)
 
         self.node_counter, self.edge_counter, self.no_edge_counter = 0, 0, 0

@@ -2,10 +2,10 @@
 # coding=utf-8
 
 import json
+from itertools import chain
 from transformers import AutoTokenizer
 
-from utility.tokenizer import Tokenizer
-from utility.bert_tokenizer import bert_tokenizer
+from utility.subtokenize import subtokenize
 
 import os
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
@@ -24,41 +24,14 @@ def load_dataset(path):
             if "edges" not in sentence:
                 sentence["edges"] = []
 
-    tokenizer = Tokenizer(data.values(), mode="space")
-
     for sample in list(data.values()):
         sample["sentence"] = sample["input"]
-
-        token_objects = tokenizer.create_tokens(sample)
-        token_objects = [t for t in token_objects if t["token"] is not None]
-
-        sample["input"] = [t["token"]["word"] if isinstance(t["token"], dict) else t["token"] for t in token_objects]
-        sample["token anchors"] = [t["span"] for t in token_objects]
-
+        sample["input"] = sample["sentence"].split(' ')
+        sample["token anchors"], offset = [], 0
+        for token in sample["input"]:
+            sample["token anchors"].append({"from": offset, "to": offset + len(token)})
+            offset += len(token) + 1
     return data
-
-
-def create_token_anchors(sentence):
-    offset = 0
-    sentence["token anchors"] = []
-
-    for w in sentence["input"]:
-        spaces = 0
-        index = sentence["sentence"][offset:].find(w)
-        if index != 0 and (index < 0 or not sentence["sentence"][offset:offset + index].isspace()) and offset < len(sentence["sentence"]):
-            while offset < len(sentence["sentence"]) and sentence["sentence"][offset] == ' ':
-                offset += 1
-
-            index = sentence["sentence"][offset:].replace(' ', '', 1).find(w)
-            spaces = 1
-            if index < 0:
-                raise Exception(f"sentence {sentence['id']} not matching companion after anchor computation.")
-
-        start = offset + index
-        end = start + len(w) + spaces
-
-        sentence["token anchors"].append({"from": start, "to": end})
-        offset = end
 
 
 def node_generator(data):
@@ -91,20 +64,12 @@ def anchor_ids_from_intervals(data):
         sentence["token anchors"] = [[a["from"], a["to"]] for a in sentence["token anchors"]]
 
 
-def tokenize(data, mode="aggressive"):
-    tokenizer = Tokenizer(data.values(), mode=mode)
-    for key in data.keys():
-        data[key] = tokenizer(data[key])
-        data[key] = tokenizer.clean(data[key])
-
-
 def create_bert_tokens(data, encoder: str):
-    tokenizer = AutoTokenizer.from_pretrained(encoder)
+    tokenizer = AutoTokenizer.from_pretrained(encoder, use_fast=True)
 
     for sentence in data.values():
-        to_scatter, bert_input = bert_tokenizer(sentence, tokenizer, encoder)
-        sentence["to scatter"] = to_scatter
-        sentence["bert input"] = bert_input
+        sentence["bert input"], spans = subtokenize(sentence["input"], tokenizer)
+        sentence["to scatter"] = list(chain(*(len(span) * [i] for i, span in enumerate(spans))))
 
 
 def create_edges(sentence, label_f=None):
