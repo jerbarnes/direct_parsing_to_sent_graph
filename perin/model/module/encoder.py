@@ -48,7 +48,7 @@ class Encoder(nn.Module):
             self.form_char_embedding = CharEmbedding(dataset.char_form_vocab_size, args.char_embedding_size, self.dim)
             self.word_dropout = WordDropout(args.dropout_word)
 
-        #self.post_layer_norm = nn.LayerNorm(self.dim)
+        self.post_layer_norm = nn.LayerNorm(self.dim)
         self.subword_attention = nn.Linear(self.dim, 1)
 
         if self.width_factor > 1:
@@ -82,8 +82,9 @@ class Encoder(nn.Module):
 
         subword_attention = self.subword_attention(encoded) / math.sqrt(self.dim)  # shape: (B, T, 1)
         subword_attention = subword_attention.expand_as(to_scatter)  # shape: (B, T_subword, T_word)
-        subword_attention = subword_attention.masked_fill(~mask, float("-inf"))  # shape: (B, T_subword, T_word)
+        subword_attention = subword_attention.masked_fill(to_scatter == 0, float("-inf"))  # shape: (B, T_subword, T_word)
         subword_attention = torch.softmax(subword_attention, dim=1)  # shape: (B, T_subword, T_word)
+        subword_attention = subword_attention.masked_fill(to_scatter.sum(1, keepdim=True) == 0, value=0.0)  # shape: (B, T_subword, T_word)
 
         encoder_output = torch.einsum("bsd,bsw->bwd", encoded, subword_attention)
 
@@ -91,7 +92,7 @@ class Encoder(nn.Module):
         # encoder_output = torch.zeros(encoded.size(0), n_words + 1, self.dim, device=encoded.device)
         # encoder_output.scatter_add_(dim=1, index=to_scatter, src=encoded)  # shape: (B, n_words + 1, H)
         # encoder_output = encoder_output[:, :-1, :]
-        # encoder_output = self.post_layer_norm(encoder_output)
+        encoder_output = self.post_layer_norm(encoder_output)
 
         if self.use_char_embedding:
             form_char_embedding = self.form_char_embedding(form_chars[0], form_chars[1], form_chars[2])
