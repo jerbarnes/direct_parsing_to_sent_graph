@@ -7,8 +7,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from transformers.models.bert import BertModel
-from transformers.models.xlm_roberta import XLMRobertaModel
+from transformers import AutoModel
 from model.module.char_embedding import CharEmbedding
 
 
@@ -31,14 +30,11 @@ class Encoder(nn.Module):
         self.n_layers = args.n_encoder_layers
         self.width_factor = args.query_length
 
-        if "roberta" in args.encoder.lower():
-            self.bert = XLMRobertaModel.from_pretrained(args.encoder, add_pooling_layer=False)
-            self.bert._set_gradient_checkpointing(self.bert.encoder, value=True)
-            if args.encoder_freeze_embedding:
-                self.bert.embeddings.requires_grad_(False)
-                self.bert.embeddings.LayerNorm.requires_grad_(True)
-        else:
-            self.bert = BertModel.from_pretrained(args.encoder, gradient_checkpointing=True, add_pooling_layer=False)
+        self.bert = AutoModel.from_pretrained(args.encoder, add_pooling_layer=False)
+        self.bert._set_gradient_checkpointing(self.bert.encoder, value=True)
+        if args.encoder_freeze_embedding:
+            self.bert.embeddings.requires_grad_(False)
+            self.bert.embeddings.LayerNorm.requires_grad_(True)
 
         if args.freeze_bert:
             self.bert.requires_grad_(False)
@@ -87,11 +83,6 @@ class Encoder(nn.Module):
         subword_attention = subword_attention.masked_fill(to_scatter.sum(1, keepdim=True) == 0, value=0.0)  # shape: (B, T_subword, T_word)
 
         encoder_output = torch.einsum("bsd,bsw->bwd", encoded, subword_attention)
-
-        # to_scatter = to_scatter.unsqueeze(-1).expand(-1, -1, self.dim)
-        # encoder_output = torch.zeros(encoded.size(0), n_words + 1, self.dim, device=encoded.device)
-        # encoder_output.scatter_add_(dim=1, index=to_scatter, src=encoded)  # shape: (B, n_words + 1, H)
-        # encoder_output = encoder_output[:, :-1, :]
         encoder_output = self.post_layer_norm(encoder_output)
 
         if self.use_char_embedding:
