@@ -38,7 +38,7 @@ class RawField(object):
 
     def preprocess(self, x):
         """ Preprocess an example if the `preprocessing` Pipeline is provided. """
-        if self.preprocessing is not None:
+        if hasattr(self, "preprocessing") and self.preprocessing is not None:
             return self.preprocessing(x)
         else:
             return x
