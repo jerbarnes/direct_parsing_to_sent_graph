@@ -11,11 +11,9 @@ class RequestParser(AbstractParser):
 
         sentences = [example["sentence"] for example in self.data.values()]
     
-        for example in zip(self.data.values()):
-            example["input"] = example["input"].strip().split(' ')
-            utils.create_token_anchors(example)
-
         for example in self.data.values():
+            example["input"] = example["sentence"].strip().split(' ')
+            utils.create_token_anchors(example)
             example["token anchors"] = [[a["from"], a["to"]] for a in example["token anchors"]]
 
         utils.create_bert_tokens(self.data, args.encoder)
