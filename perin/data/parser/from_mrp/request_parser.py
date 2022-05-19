@@ -13,7 +13,6 @@ class RequestParser(AbstractParser):
     
         for example in self.data.values():
             example["input"] = example["sentence"].strip().split(' ')
-            utils.create_token_anchors(example)
             example["token anchors"], offset = [], 0
             for token in example["input"]:
                 example["token anchors"].append([offset, offset + len(token)])
