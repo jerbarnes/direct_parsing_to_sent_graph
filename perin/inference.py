@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # coding=utf-8
 
+import os
 import argparse
 import torch
 
@@ -18,20 +19,18 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     checkpoint = torch.load(args.checkpoint)
-    args = Params().load_state_dict(checkpoint["args"]).init_data_paths(args.data_directory)
+    args = Params().load_state_dict(checkpoint["args"])
     args.log_wandb = False
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    directory = initialize(args, create_directory=True, init_wandb=False, directory_prefix="inference_")
+    initialize(args, init_wandb=False)
 
     dataset = Dataset(args)
-    dataset.load_datasets(args)
 
     model = Model(dataset, args).to(device)
     model.load_state_dict(checkpoint["model"])
 
+    directory = "./inference_prediction"
+    os.makedirs(directory, exist_ok=True)
     print("inference of validation data", flush=True)
-    predict(model, dataset.val, args.validation_data, args, directory, 0, run_evaluation=True, epoch=0)
-
-    print("inference of test data", flush=True)
-    predict(model, dataset.test, args.test_data, args, f"{directory}/test_predictions", 0)
+    predict(model, dataset.val, args.validation_data, args, None, directory, device)
