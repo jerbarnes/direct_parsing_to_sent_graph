@@ -192,7 +192,7 @@ class AbstractHead(nn.Module):
         if classifier is None:
             return None
         return classifier(decoder_output, encoder_output, encoder_mask)
-    
+
     def inference_label(self, prediction):
         prediction = prediction.exp()
         return torch.where(
