@@ -1,4 +1,4 @@
-<h1 align="center"><b>Direct parsing to sentiment graphs (WIP)</b></h1>
+<h1 align="center"><b>Direct parsing to sentiment graphs</b></h1>
 
 <p align="center">
   <i><b>David Samuel, Jeremy Barnes, Robin Kurtz, Stephan Oepen, Lilja Øvrelid and Erik Velldal</b></i>
@@ -14,7 +14,7 @@
 <br>
 
 <p align="center">
-  <a href="TODO"><b>Paper</b></a><br>
+  <a href="https://arxiv.org/abs/2203.13209"><b>Paper</b></a><br>
   <a href="TODO"><b>Pretrained models</b></a><br>
   <a href="TODO"><b>Interactive demo on Google Colab</b></a>
 </p>
