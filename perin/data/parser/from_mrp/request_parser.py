@@ -6,7 +6,7 @@ from data.parser.from_mrp.abstract_parser import AbstractParser
 
 
 class RequestParser(AbstractParser):
-    def __init__(self, sentences, args, language: str, fields):
+    def __init__(self, sentences, args, fields):
         self.data = {i: {"id": str(i), "sentence": sentence} for i, sentence in enumerate(sentences)}
 
         sentences = [example["sentence"] for example in self.data.values()]

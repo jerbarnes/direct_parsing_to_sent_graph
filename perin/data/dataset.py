@@ -72,9 +72,9 @@ class Dataset:
             "vocabs": {key: pickle.dumps(value.vocab) for key, value in self.__dict__.items() if hasattr(value, "vocab")}
         }
 
-    def load_sentences(self, sentences, args, language: str):
+    def load_sentences(self, sentences, args):
         dataset = RequestParser(
-            sentences, args, language,
+            sentences, args,
             fields={
                 "input": [("every_input", self.every_word_input_field), ("char_form_input", self.char_form_field)],
                 "bert input": ("input", self.bert_input_field),
