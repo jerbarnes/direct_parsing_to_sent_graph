@@ -53,5 +53,22 @@ python3 inference.py --checkpoint "path_to_pretrained_model.h5" --data_directory
 ## Citation
 
 ```
-TBA
+@inproceedings{samuel-etal-2022-direct,
+    title = "Direct parsing to sentiment graphs",
+    author = "Samuel, David  and
+      Barnes, Jeremy  and
+      Kurtz, Robin  and
+      Oepen, Stephan  and
+      {\O}vrelid, Lilja  and
+      Velldal, Erik",
+    booktitle = "Proceedings of the 60th Annual Meeting of the Association for Computational Linguistics (Volume 2: Short Papers)",
+    month = may,
+    year = "2022",
+    address = "Dublin, Ireland",
+    publisher = "Association for Computational Linguistics",
+    url = "https://aclanthology.org/2022.acl-short.51",
+    doi = "10.18653/v1/2022.acl-short.51",
+    pages = "470--478",
+    abstract = "This paper demonstrates how a graph-based semantic parser can be applied to the task of structured sentiment analysis, directly predicting sentiment graphs from text. We advance the state of the art on 4 out of 5 standard benchmark sets. We release the source code, models and predictions.",
+}
 ```
